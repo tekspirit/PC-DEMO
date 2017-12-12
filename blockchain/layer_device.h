@@ -33,4 +33,4 @@ void device_location(device_t *device);
 void device_release(device_t *device);
 void print_status(void);
 void print_route(void);
-uint8 process_device(device_t *device);
+void process_device(device_t *device);

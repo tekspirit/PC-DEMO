@@ -7,4 +7,4 @@
 //typedef
 //struct
 //function
-uint8 process_mainchain(void);
+void process_mainchain(device_t *device);

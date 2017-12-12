@@ -1,5 +1,10 @@
 #include "layer_mainchain.h"
 
+void process_mainchain(device_t *device)
+{
+}
+
+#if 0
 extern uint32 g_devicenum;//设备个数
 extern uint32 g_devicerange;//设备坐标范围
 extern uint32 g_devicestep;//设备步进值
@@ -14,7 +19,7 @@ uint8 process_mainchain(void)
 	route_t *route;
 	uint32 device_index;
 
-	switch(g_task)
+	switch(g_mainchain.queue[0].)
 	{
 	case TASK_DEVICE_INITIAL:
 		break;
@@ -170,3 +175,4 @@ uint8 process_mainchain(void)
 
 	return 0;
 }
+#endif

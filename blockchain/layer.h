@@ -2,35 +2,30 @@
 
 //include
 #include "include.h"
-#include "crypt_hash.h"
+//#include "crypt_hash.h"
 //define
-#define DEVICE_LENGTH 100 //预估设备最大数
-#define QUEUE_LENGTH 100 //消息队列长度
-#define TRANSACTION_LENGTH 100 //transaction长度(交易数)
-#define TANGLE_LENGTH 1000 //tangle长度(交易数)
+#define BUFFER_LENGTH 0x100
 
-#define QUEUE_LEN 80 //消息队列信息长度
-#define KEY_LEN 4 //密钥对字节数
+#define NODE_HEAVY 0
+#define NODE_LIGHT 1
 
-#define INFO_TX 0
-#define INFO_RX 1
-#define INFO_KEY 2
-#define INFO_TRANSACTION 3
-#define INFO_TANGLE 4
-#define INFO_VALID_TRANSACTION 5
-#define INFO_VALID_LEDGER 6
+#define STATUS_FREE 0
+#define STATUS_MASTER 1
+#define STATUS_SLAVE 2
 
-#define TASK_NONE 0
-#define TASK_DEVICE_INITIAL 1
-#define TASK_DEVICE_CONNECT 2
-#define TASK_DEVICE_MERGE 3
-#define TASK_DEVICE_OPTIMIZE 4
-#define TASK_DEVICE_INDEXDAG 5
-#define TASK_DEVICE_WALK 6
-#define TASK_DAG_INITIAL 7
-#define TASK_DAG_TANGLE 8
+#define TIMER_CONNECT 1 //组网更新时间(重节点向服务器)
+//enum
+typedef enum step
+{
+	STEP_INITIAL,STEP_CONNECT,STEP_MERGE,STEP_OPTIMIZE,STEP_INDEXDAG,STEP_TANGLE
+};
 //typedef
 //struct
+struct msg_t
+{
+	uint8 type;
+
+};
 struct route_t
 {
 	uint8 flag;//0-未连接,1-连接
@@ -39,51 +34,39 @@ struct route_t
 	uint32 *path;//路由路径
 	route_t *next;
 };
-struct queue_t
+struct index_t
 {
-	volatile uint32 device_index;//设备索引(类似于唯一物理地址)
-	volatile uint32 info;//消息类型.0-INFO_TX,1-INFO_RX,2-INFO_TRANSACTION,3-INFO_TANGLE,4-INFO_VALID_TRANSACTION,5-INFO_VALID_LEDGER
-	volatile uint8 buffer[QUEUE_LEN];//具体信息
-};
-struct key_t
-{
-	uint32 device_index;//设备索引(类似于唯一物理地址)
-	uint8 buffer[65*4];//公钥rsa=1(e)+64(n)=65 word
-};
-struct transaction_t
-{
-	volatile uint32 device_index;//设备索引(类似于唯一物理地址)
-	hash_t index;//交易索引
-	uint32 weight_self;//自身权重
-	uint32 weight_accu;//累积权重
-	uint32 height;//高度(至创世块)
-	uint32 depth;//深度(至最远tip)
-	uint32 integral;//交易积分
-	uint32 nonce;//临时随机数(证明是从当前device发出,防止女巫攻击和批量交易攻击)
-	uint8 type;//交易类型.0-普通信息,1-有价信息
-	uint8 plain[KEY_LEN];//明文验证
-	uint8 cipher[KEY_LEN];//密文验证
-	uint32 pow[2];//按计算规则得到的前序trunk/branch的pow值
-	//hash_t address;//地址
-	//hash_t trunk;//主交易
-	//hash_t branch;//从交易
-	//hash_t bundle;//包
-	//hash_t tag;//标签
-	volatile uint8 flag;//交易状态.0-none,1-solid,2-tangle,3-milestone
-	hash_t trunk;//主交易节点->交易索引
-	hash_t branch;//从交易节点->交易索引
+	uint32 *index;//设备索引列表
+	uint32 number;//设备索引数目
+	index_t *next;
 };
 struct device_t
 {
 	//device
 	uint32 x;
 	uint32 y;
-	uint8 node;//0-重节点(包含全账本),1-轻节点(无账本)
-	uint8 line;//0-在线,1-掉线
+	uint8 node;//0-主链/重节点(包含全局账本或区域账本),1-轻节点(无账本)
+	//uint8 line;//0-在线,1-掉线
 	uint32 device_index;//设备索引(类似于唯一物理地址)
+	volatile uint8 step;
+	uint8 buffer[BUFFER_LENGTH];//数据接收缓冲区
+
+
+
+
 	uint8 status;//0-作为free,1-作为master,2-作为slave
 	route_t *route;//连接设备路由链表
-	queue_t queue[QUEUE_LENGTH];//设备的消息队列(发送/接收)
+
+	//index_t *index;//设备索引链表
+	//dag
+	volatile uint32 dag_index;//子链索引.0-孤立点,其他-索引号
+
+
+	/*
+
+	uint8 status;//0-作为free,1-作为master,2-作为slave
+	route_t *route;//连接设备路由链表
+	//queue_t queue[QUEUE_LENGTH];//设备的消息队列(发送/接收)
 	uint32 queue_index;//queue索引长度
 	//dag
 	volatile uint32 dag_index;//子链索引.0-孤立点,其他-索引号
@@ -97,5 +80,6 @@ struct device_t
 	//application
 	uint32 account_id;//账户id
 	uint32 account_money;//账户现金
+	*/
 };
 //function

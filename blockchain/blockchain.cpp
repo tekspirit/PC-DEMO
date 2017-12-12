@@ -23,8 +23,8 @@ uint32 WINAPI thread_mainchain(PVOID pParam)
 	device=(device_t *)pParam;
 	while(1)
 	{
-		process_mainchain(device);
 		EnterCriticalSection(&g_cs);
+		process_mainchain(device);
 		//printf("initial thread_mainchain pass\r\n");
 		LeaveCriticalSection(&g_cs);
 	}
@@ -36,19 +36,16 @@ uint32 WINAPI thread_mainchain(PVOID pParam)
 uint32 WINAPI thread_device(PVOID pParam)
 {
 	device_t *device;
-	uint8 flag;
 
 	device=(device_t *)pParam;
+	//SetTimer(NULL,device->device_index,TIMER_CONNECT*1000,NULL);
 	while(1)
 	{
-		if (g_task==g_flag[device->device_index])
-		{
-			flag=g_task<=TASK_DEVICE_WALK ? process_device(device) : process_dag(device);
-			EnterCriticalSection(&g_cs);
-			//printf("%s thread_device%ld pass\r\n",g_string[g_task],device->device_index);
-			g_flag[device->device_index]=TASK_NONE;
-			LeaveCriticalSection(&g_cs);
-		}
+		EnterCriticalSection(&g_cs);
+		process_device(device);
+		//printf("%s thread_device%ld pass\r\n",g_string[g_task],device->device_index);
+		//g_flag[device->device_index]=TASK_NONE;
+		LeaveCriticalSection(&g_cs);
 	}
 
 	return 0;
@@ -56,23 +53,17 @@ uint32 WINAPI thread_device(PVOID pParam)
 
 void main(int argc,char* argv[])
 {
-	uint32 interval;//Timer刷新间隔(秒)
 	uint32 account_num;//账户个数
 	uint32 money;//初始化资金
 	//
 	uint32 i;
 	int8 buf[1000];
 	FILE *file;
-	MSG msg;
 	HANDLE thread_handle;
 	uint32 thread_id;
 
 	//read initial.ini
 	file=fopen("initial.ini","r");
-	fgets(buf,1000,file);//[system]
-	fgets(buf,1000,file);
-	buf[strlen(buf)-1]=0;
-	interval=atol(&buf[9]);//interval
 	fgets(buf,1000,file);//[network]
 	fgets(buf,1000,file);
 	buf[strlen(buf)-1]=0;
@@ -93,31 +84,34 @@ void main(int argc,char* argv[])
 	fclose(file);
 	//0.initial device/timer/thread_device/thread_mainchain/cs
 	InitializeCriticalSection(&g_cs);
-	srand((unsigned)time(NULL));
+	srand((unsigned)time(NULL));/*
 	g_index=0;
 	g_task=TASK_DEVICE_INITIAL;
 	g_init=new uint8[g_devicenum];
 	memset((void *)g_init,0,g_devicenum*sizeof(uint8));
 	g_flag=new uint8[g_devicenum];
-	memset((void *)g_flag,TASK_DEVICE_INITIAL,g_devicenum*sizeof(uint8));
+	memset((void *)g_flag,TASK_DEVICE_INITIAL,g_devicenum*sizeof(uint8));*/
 	g_device=new device_t[g_devicenum];
 	for (i=0;i<g_devicenum;i++)
 	{
 		g_device[i].x=rand()%g_devicerange;
 		g_device[i].y=rand()%g_devicerange;
-		g_device[i].node=DEVICE_NODE_HEAVY;//rand()%2 ? DEVICE_NODE_LIGHT : DEVICE_NODE_HEAVY;
-		g_device[i].line=DEVICE_LINE_ON;
+		g_device[i].node=NODE_HEAVY;//rand()%2 ? DEVICE_NODE_LIGHT : DEVICE_NODE_HEAVY;
+		//g_device[i].line=DEVICE_LINE_ON;
 		g_device[i].device_index=i;
 		g_device[i].status=DEVICE_STATUS_FREE;
 		g_device[i].route=NULL;
+		g_device[i].index=NULL;
+		g_device[i].dag_index=0;
+		memset((void *)g_device[i].buffer,0,BUFFER_LENGTH*sizeof(uint8));
+		/*
 		memset((void *)g_device[i].queue,0,QUEUE_LENGTH*sizeof(queue_t));//INFO_TX
 		g_device[i].queue_index=0;
-		g_device[i].dag_index=0;
 		g_device[i].tangle_index=0;
 		g_device[i].transaction_index=0;
 		g_device[i].key_index=0;
 		g_device[i].account_id=rand()%account_num;
-		g_device[i].account_money=money;
+		g_device[i].account_money=money;*/
 		//lpThreadAttributes:指向security attributes
 		//dwStackSize:栈大小
 		//lpStartAddress:线程函数。定义形式必须uint32 WINAPI xxx(PVOID pParam)
@@ -137,142 +131,14 @@ void main(int argc,char* argv[])
 		printf("initial thread_mainchain failed\r\n");
 		return;
 	}
-	SetTimer(NULL,1,interval*1000,NULL);
 	//msg loop
-	while(1)
-	{
-		//get message from thread's message queue
-		GetMessage(&msg,NULL,0,0);
-		//
-		switch(g_task)
-		{
-		case TASK_DEVICE_INITIAL://0.initial device
-			while(1)
-			{
-				for (i=0;i<g_devicenum;i++)
-					if (g_flag[i]!=TASK_NONE)
-						break;
-				if (i==g_devicenum)
-					break;
-			}
-			g_task=TASK_DEVICE_CONNECT;
-			memset((void *)g_flag,TASK_DEVICE_CONNECT,g_devicenum*sizeof(uint8));
-			break;
-		case TASK_DEVICE_CONNECT://1.connect device
-			while(1)
-			{
-				for (i=0;i<g_devicenum;i++)
-					if (g_flag[i]!=TASK_NONE)
-						break;
-				if (i==g_devicenum)
-					break;
-			}
-			//print_status();
-			//print_route();
-			g_task=TASK_DEVICE_MERGE;
-			memset((void *)g_init,0,g_devicenum*sizeof(uint8));
-			memset((void *)g_flag,TASK_DEVICE_MERGE,g_devicenum*sizeof(uint8));
-			for (i=0;i<g_devicenum;i++)
-				memset((void *)g_device[i].queue,0,QUEUE_LENGTH*sizeof(queue_t));
-			break;
-		case TASK_DEVICE_MERGE://2.merge route
-			while(1)
-			{
-				for (i=0;i<g_devicenum;i++)
-					if (g_flag[i]!=TASK_NONE)
-						break;
-				if (i==g_devicenum)
-					break;
-			}
-			//print_status();
-			//print_route();
-			//while(1);
-			g_task=TASK_DEVICE_OPTIMIZE;
-			memset((void *)g_init,0,g_devicenum*sizeof(uint8));
-			memset((void *)g_flag,TASK_DEVICE_OPTIMIZE,g_devicenum*sizeof(uint8));
-			for (i=0;i<g_devicenum;i++)
-				memset((void *)g_device[i].queue,0,QUEUE_LENGTH*sizeof(queue_t));
-			break;
-		case TASK_DEVICE_OPTIMIZE://3.optimize route
-			while(1)
-			{
-				for (i=0;i<g_devicenum;i++)
-					if (g_flag[i]!=TASK_NONE)
-						break;
-				if (i==g_devicenum)
-					break;
-			}
-			g_task=TASK_DEVICE_INDEXDAG;
-			memset((void *)g_flag,TASK_DEVICE_INDEXDAG,g_devicenum*sizeof(uint8));
-			break;
-		case TASK_DEVICE_INDEXDAG://4.index dag
-			while(1)
-			{
-				for (i=0;i<g_devicenum;i++)
-					if (g_flag[i]!=TASK_NONE)
-						break;
-				if (i==g_devicenum)
-					break;
-			}
-			//print_status();
-			//print_route();
-			//while(1);
-			g_task=TASK_DAG_INITIAL;
-			memset((void *)g_init,0,g_devicenum*sizeof(uint8));
-			memset((void *)g_flag,TASK_DAG_INITIAL,g_devicenum*sizeof(uint8));
-			for (i=0;i<g_devicenum;i++)
-				memset((void *)g_device[i].queue,0,QUEUE_LENGTH*sizeof(queue_t));
-			break;
-		case TASK_DAG_INITIAL://5.dag initial
-			while(1)
-			{
-				for (i=0;i<g_devicenum;i++)
-					if (g_flag[i]!=TASK_NONE)
-						break;
-				if (i==g_devicenum)
-					break;
-			}
-			//while(1);
-			g_task=TASK_DAG_TANGLE;
-			memset((void *)g_init,0,g_devicenum*sizeof(uint8));
-			memset((void *)g_flag,TASK_DAG_TANGLE,g_devicenum*sizeof(uint8));
-			break;
-		case TASK_DAG_TANGLE://6.dag tangle
-			while(1)
-			{
-				for (i=0;i<g_devicenum;i++)
-					if (g_flag[i]!=TASK_NONE)
-						break;
-				if (i==g_devicenum)
-					break;
-			}
-			while(1);
-			g_task=TASK_DEVICE_WALK;
-			memset((void *)g_init,0,g_devicenum*sizeof(uint8));
-			memset((void *)g_flag,TASK_DEVICE_WALK,g_devicenum*sizeof(uint8));
-			for (i=0;i<g_devicenum;i++)
-				memset((void *)g_device[i].queue,0,QUEUE_LENGTH*sizeof(queue_t));
-			break;
-		case TASK_DEVICE_WALK://7.device walk & reconstruct
-			while(1)
-			{
-				for (i=0;i<g_devicenum;i++)
-					if (g_flag[i]!=TASK_NONE)
-						break;
-				if (i==g_devicenum)
-					break;
-			}
-			g_task=TASK_DEVICE_INITIAL;
-			memset((void *)g_init,0,g_devicenum*sizeof(uint8));
-			memset((void *)g_flag,TASK_DEVICE_INITIAL,g_devicenum*sizeof(uint8));
-			break;
-		}
-	}
+	while(1);
 	//release
+	/*
 	for (i=0;i<g_devicenum;i++)
 		device_release(&g_device[i]);
 	delete[] (uint8 *)g_init;
 	delete[] (uint8 *)g_flag;
-	delete[] g_device;
+	delete[] g_device;*/
 	DeleteCriticalSection(&g_cs);
 }

@@ -1,8 +1,8 @@
 #pragma once
 
 //include
+#include "layer_mainchain.h"
 #include "layer_device.h"
-#include "layer_dag.h"
 //define
 //typedef
 //struct
