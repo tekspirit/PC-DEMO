@@ -43,6 +43,7 @@ uint32 WINAPI thread_device(PVOID pParam)
 	{
 		EnterCriticalSection(&g_cs);
 		process_device(device);
+		//printf("%d",device->step);
 		//printf("%s thread_device%ld pass\r\n",g_string[g_task],device->device_index);
 		//g_flag[device->device_index]=TASK_NONE;
 		LeaveCriticalSection(&g_cs);
@@ -57,6 +58,7 @@ void main(int argc,char* argv[])
 	uint32 money;//初始化资金
 	//
 	uint32 i;
+	uint8 flag;
 	int8 buf[1000];
 	FILE *file;
 	HANDLE thread_handle;
@@ -99,9 +101,9 @@ void main(int argc,char* argv[])
 		g_device[i].node=NODE_HEAVY;//rand()%2 ? DEVICE_NODE_LIGHT : DEVICE_NODE_HEAVY;
 		//g_device[i].line=DEVICE_LINE_ON;
 		g_device[i].device_index=i;
-		g_device[i].status=DEVICE_STATUS_FREE;
+		g_device[i].status=STATUS_FREE;
+		g_device[i].step=STEP_CONNECT;
 		g_device[i].route=NULL;
-		g_device[i].index=NULL;
 		g_device[i].dag_index=0;
 		memset((void *)g_device[i].buffer,0,BUFFER_LENGTH*sizeof(uint8));
 		/*
@@ -132,7 +134,28 @@ void main(int argc,char* argv[])
 		return;
 	}
 	//msg loop
-	while(1);
+	while(1)
+	{
+#if 1
+		EnterCriticalSection(&g_cs);
+
+		flag=0;
+		for (i=0;i<g_devicenum;i++)
+			if (g_device[i].step==STEP_CONNECT)
+			{
+				flag=1;
+				break;
+			}
+		if (!flag)
+			printf("ok");
+		/*
+		for (i=0;i<g_devicenum;i++)
+			printf("%d",g_device[i].step);
+		printf("\r\n");
+		*/
+		LeaveCriticalSection(&g_cs);
+#endif
+	}
 	//release
 	/*
 	for (i=0;i<g_devicenum;i++)

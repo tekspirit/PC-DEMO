@@ -17,15 +17,14 @@
 //enum
 typedef enum step
 {
-	STEP_CONNECT,STEP_TANGLE
+	STEP_INITIAL,STEP_CONNECT,STEP_MERGE,STEP_OPTIMIZE,STEP_INDEXDAG,STEP_TANGLE
 };
 //typedef
 //struct
-struct index_t
+struct msg_t
 {
-	uint32 *index;//设备索引列表
-	uint32 number;//设备索引数目
-	index_t *next;
+	uint8 type;
+
 };
 struct route_t
 {
@@ -33,8 +32,13 @@ struct route_t
 	uint32 device_index;//终设备索引(类似于唯一物理地址)
 	uint32 hops;//跳跃间隔
 	uint32 *path;//路由路径
-	index_t *index;//设备索引链表
 	route_t *next;
+};
+struct index_t
+{
+	uint32 *index;//设备索引列表
+	uint32 number;//设备索引数目
+	index_t *next;
 };
 struct device_t
 {

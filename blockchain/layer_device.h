@@ -23,14 +23,25 @@
 //typedef
 //struct
 //function
-void route_insert(device_t *device,route_t *route);
+/*
 void route_mark(device_t *device,uint32 device_index);
 route_t *route_check(device_t *device);
 route_t *route_exist(device_t *device,uint32 index);
-uint32 device_seek(device_t *device);
+
+
+
+
+
+
+
 void device_recurse(device_t *device);
 void device_location(device_t *device);
 void device_release(device_t *device);
 void print_status(void);
 void print_route(void);
+*/
+
+
+void route_insert(device_t *device,route_t *route);
+uint8 device_seek(device_t *device);
 void process_device(device_t *device);

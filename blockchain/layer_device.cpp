@@ -8,7 +8,7 @@ extern device_t *g_device;//设备数组
 extern volatile uint8 g_task;//传递给线程的过程标记
 extern volatile uint8 *g_init;//每个线程的初始化任务.0-未初始化,1-已初始化
 
-
+#if 0
 
 void route_mark(device_t *device,uint32 device_index)
 {
@@ -187,7 +187,7 @@ void print_route(void)
 		printf("\r\n");
 	}
 }
-
+#endif
 
 //new
 //route insert into device->route
@@ -197,62 +197,62 @@ void route_insert(device_t *device,route_t *route)
 	device->route=route;
 }
 
-//index insert into device->index
-void index_insert(device_t *device,index_t *index)
-{
-	index->next=device->index;
-	device->index=index;
-}
-
 //0-not find,1-find
 uint8 device_seek(device_t *device)
 {
 	//broadcasting to seek/malloc device
 	uint32 i;
-	route_t *route,*insert;
-	uint8 flag;
+	route_t *route;
+	uint8 flag,exist;
 
-	flag=0;
+	exist=0;
 	for (i=0;i<g_devicenum;i++)
 	{
 		if (i==device->device_index)
 			continue;
 		if (math_distance(device->x,device->y,g_device[i].x,g_device[i].y)<=MAX_METRIC)
 		{
+			flag=0;
 			route=device->route;
 			while(route)
 			{
 				if (route->device_index==g_device[i].device_index)
+				{
+					flag=1;
 					break;
+				}
+				route=route->next;
 			}
-
-
-			insert=new route_t;
-			insert->flag=0;
-			insert->device_index=g_device[i].device_index;
-			insert->hops=1;
-			insert->path=NULL;
-			insert->next=NULL;
-			route_insert(device,insert);
 			if (!flag)
-				flag=1;
+			{
+				route=new route_t;
+				route->flag=0;
+				route->device_index=g_device[i].device_index;
+				route->hops=1;
+				route->path=NULL;
+				route->index=NULL;
+				route->next=NULL;
+				route_insert(device,route);
+				exist=1;
+			}
 		}
 	}
 
-	return flag;
+	return exist;
 }
 
 void process_device(device_t *device)
 {
 	route_t *route,*insert,*point[2];
+	index_t *index;
 	uint8 flag;
 
 	switch(device->step)
 	{
 	case STEP_CONNECT:
 		//send
-		device->buffer[0]=STEP_TANGLE;
-		if (!device_seek(device))//no device visible
+		device->step=STEP_TANGLE;
+		if (!device_seek(device))//no more device addin
 			break;
 		//recv
 		route=device->route;
@@ -260,7 +260,7 @@ void process_device(device_t *device)
 		{
 			g_device[route->device_index].step=STEP_CONNECT;
 			flag=0;
-			point[1]=g_device[route->device_index]->route;//compare with device->device_index
+			point[1]=g_device[route->device_index].route;//compare with device->device_index
 			while(point[1])
 			{
 				if (point[1]->device_index==device->device_index)
@@ -280,11 +280,11 @@ void process_device(device_t *device)
 				insert->next=NULL;
 				route_insert(&g_device[route->device_index],insert);
 			}
-			point[0]=device->route;//check device route
+			point[0]=device->route;
 			while(point[0])
 			{
 				flag=0;
-				point[1]=g_device[route->device_index]->route;//compare with device->route
+				point[1]=g_device[route->device_index].route;//compare with device->route
 				while(point[1])
 				{
 					if (point[1]->device_index==point[0]->device_index)
@@ -295,14 +295,21 @@ void process_device(device_t *device)
 					point[1]=point[1]->next;
 				}
 				if (!flag)
-					index->index[index->number++]=point[0]->device_index;
+				{
+					insert=new route_t;
+					insert->flag=0;
+					insert->device_index=point[0]->device_index;
+					insert->hops=1;
+					insert->path=NULL;
+					insert->next=NULL;
+					route_insert(&g_device[route->device_index],insert);
+				}
 				point[0]=point[0]->next;
 			}
-
 			route=route->next;
 		}
-
-
+		break;
+	case STEP_TANGLE:
 		break;
 	}
 }
