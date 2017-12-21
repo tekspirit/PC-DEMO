@@ -4,7 +4,7 @@
 #include "include.h"
 //#include "crypt_hash.h"
 //define
-#define BUFFER_LENGTH 0x100
+#define QUEUE_LENGTH 0x20
 
 #define NODE_HEAVY 0
 #define NODE_LIGHT 1
@@ -13,52 +13,83 @@
 #define STATUS_MASTER 1
 #define STATUS_SLAVE 2
 
+#define STEP_CONNECT 0
+#define STEP_TANGLE 1
+
 #define TIMER_CONNECT 1 //组网更新时间(重节点向服务器)
-//enum
-typedef enum step
-{
-	STEP_CONNECT,STEP_TANGLE
-};
 //typedef
 //struct
-struct index_t
+struct msg_t
 {
-	uint32 *index;//设备索引列表
-	uint32 number;//设备索引数目
-	index_t *next;
+	uint8 type;
 };
 struct route_t
 {
 	uint8 flag;//0-未连接,1-连接
 	uint32 device_index;//终设备索引(类似于唯一物理地址)
-	uint32 hops;//跳跃间隔
+	//uint32 hops;//跳跃间隔
 	uint32 *path;//路由路径
-	index_t *index;//设备索引链表
 	route_t *next;
+};
+/*
+struct index_t
+{
+	uint32 *index;//设备索引列表
+	uint32 number;//设备索引数目
+	index_t *next;
+};*/
+struct index_t
+{
+	uint32 number;//待处理索引数目
+	uint32 *data;//待处理索引列表
+};
+struct queue_t
+{
+	volatile uint8 step;
+	uint8 *data;
+	queue_t *next;
+};
+struct list_t
+{
+	uint32 dag_index;//区域索引
+	uint32 device_index;//设备索引
+	uint8 node;//0-重节点,1-轻节点
+	uint8 *key_e;//公钥
+};
+struct mainchain_t
+{
+	//mainchain
+	volatile uint8 step;
+	queue_t *queue;//消息队列
+	list_t *list;
+
 };
 struct device_t
 {
 	//device
 	uint32 x;
 	uint32 y;
-	uint8 node;//0-主链/重节点(包含全局账本或区域账本),1-轻节点(无账本)
+	uint8 node;//0-重节点(区域账本),1-轻节点(无账本)
 	//uint8 line;//0-在线,1-掉线
 	uint32 device_index;//设备索引(类似于唯一物理地址)
-	volatile uint8 step;
-	uint8 buffer[BUFFER_LENGTH];//数据接收缓冲区
+	//volatile uint8 step;
+	queue_t *queue;//消息队列
+	//list_t *list;//节点列表(重节点使用)
+
+	//uint8 buffer[BUFFER_LENGTH];//数据接收缓冲区
 
 
 
 
 	uint8 status;//0-作为free,1-作为master,2-作为slave
 	route_t *route;//连接设备路由链表
-
+/*
 	//index_t *index;//设备索引链表
 	//dag
 	volatile uint32 dag_index;//子链索引.0-孤立点,其他-索引号
 
 
-	/*
+	
 
 	uint8 status;//0-作为free,1-作为master,2-作为slave
 	route_t *route;//连接设备路由链表

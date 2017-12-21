@@ -40,8 +40,11 @@ void device_release(device_t *device);
 void print_status(void);
 void print_route(void);
 */
-
-
 void route_insert(device_t *device,route_t *route);
-uint8 device_seek(device_t *device);
+void route_delete(device_t *device);
+void queue_insert(device_t *device,queue_t *queue);
+void queue_delete(device_t *device);
+void device_recv(device_t *device);
+void device_seek(device_t *device);
+void device_send(device_t *device);
 void process_device(device_t *device);

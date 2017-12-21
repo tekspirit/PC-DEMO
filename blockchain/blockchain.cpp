@@ -63,6 +63,7 @@ void main(int argc,char* argv[])
 	FILE *file;
 	HANDLE thread_handle;
 	uint32 thread_id;
+	queue_t *queue;
 
 	//read initial.ini
 	file=fopen("initial.ini","r");
@@ -102,10 +103,27 @@ void main(int argc,char* argv[])
 		//g_device[i].line=DEVICE_LINE_ON;
 		g_device[i].device_index=i;
 		g_device[i].status=STATUS_FREE;
-		g_device[i].step=STEP_CONNECT;
+		//g_device[i].step=STEP_CONNECT;
 		g_device[i].route=NULL;
-		g_device[i].dag_index=0;
-		memset((void *)g_device[i].buffer,0,BUFFER_LENGTH*sizeof(uint8));
+		g_device[i].queue=NULL;
+
+		queue=new queue_t;
+		queue->step=STEP_CONNECT;
+		queue->data=new uint8[1*sizeof(uint32)];
+		*(uint32 *)queue->data=0;//align problem?
+		queue_insert(&g_device[i],queue);
+		/*
+		queue=new queue_t;
+		queue->step=STEP_CONNECT;
+		queue->data=new uint8[(1+1)*sizeof(uint32)];
+		*(uint32 *)queue->data=1;//align problem?
+		*(uint32 *)(queue->data+4)=i;
+		queue_insert(&g_device[i],queue);
+		*/
+
+
+		//g_device[i].dag_index=0;
+		//memset((void *)g_device[i].buffer,0,BUFFER_LENGTH*sizeof(uint8));
 		/*
 		memset((void *)g_device[i].queue,0,QUEUE_LENGTH*sizeof(queue_t));//INFO_TX
 		g_device[i].queue_index=0;
@@ -138,10 +156,9 @@ void main(int argc,char* argv[])
 	{
 #if 1
 		EnterCriticalSection(&g_cs);
-
 		flag=0;
 		for (i=0;i<g_devicenum;i++)
-			if (g_device[i].step==STEP_CONNECT)
+			if (!g_device[i].queue || g_device[i].queue->step==STEP_CONNECT)
 			{
 				flag=1;
 				break;
