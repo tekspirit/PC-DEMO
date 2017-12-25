@@ -3,16 +3,6 @@
 //include
 #include "layer.h"
 //define
-#define DEVICE_STATUS_FREE 0
-#define DEVICE_STATUS_MASTER 1
-#define DEVICE_STATUS_SLAVE 2
-
-#define DEVICE_NODE_HEAVY 0
-#define DEVICE_NODE_LIGHT 1
-
-#define DEVICE_LINE_ON 0
-#define DEVICE_LINE_OFF 1
-
 #define MAX_MASTER_SLAVE 5 //maybe 7
 #define MIN_MASTER_SLAVE 3
 
@@ -27,13 +17,6 @@
 void route_mark(device_t *device,uint32 device_index);
 route_t *route_check(device_t *device);
 route_t *route_exist(device_t *device,uint32 index);
-
-
-
-
-
-
-
 void device_recurse(device_t *device);
 void device_location(device_t *device);
 void device_release(device_t *device);
@@ -44,6 +27,7 @@ void route_insert(device_t *device,route_t *route);
 void route_delete(device_t *device);
 void queue_insert(device_t *device,queue_t *queue);
 void queue_delete(device_t *device);
+void key_generate(device_t *device);
 void device_recv(device_t *device);
 void device_seek(device_t *device);
 void device_send(device_t *device);

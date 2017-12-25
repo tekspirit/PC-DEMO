@@ -89,6 +89,14 @@ SOURCE=.\blockchain.cpp
 # End Source File
 # Begin Source File
 
+SOURCE=.\crypt_bignum.cpp
+# End Source File
+# Begin Source File
+
+SOURCE=.\crypt_rsa.cpp
+# End Source File
+# Begin Source File
+
 SOURCE=.\include.cpp
 # End Source File
 # Begin Source File
@@ -110,6 +118,14 @@ SOURCE=.\layer_mainchain.cpp
 # Begin Source File
 
 SOURCE=.\blockchain.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\crypt_bignum.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\crypt_rsa.h
 # End Source File
 # Begin Source File
 

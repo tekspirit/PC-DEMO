@@ -245,7 +245,39 @@ void queue_delete(queue_t *prev,queue_t *queue)
 	delete queue;
 }
 
-//
+//generate device->rsa
+void key_generate(device_t *device)
+{
+	uint8 flag;
+
+	//malloc
+	device->rsa.le=KEY_E;
+	device->rsa.len=KEY_LEN;
+	device->rsa.lr=KEY_MASK;
+	device->rsa.e=new uint8[device->rsa.le];
+	device->rsa.n=new uint8[device->rsa.len];
+	device->rsa.p=new uint8[device->rsa.len>>1];
+	device->rsa.q=new uint8[device->rsa.len>>1];
+	device->rsa.d=new uint8[device->rsa.len];
+	device->rsa.dp=new uint8[device->rsa.len>>1];
+	device->rsa.dq=new uint8[device->rsa.len>>1];
+	device->rsa.qp=new uint8[device->rsa.len>>1];
+	//generate
+	device->rsa.e[0]=0x01;
+	device->rsa.e[1]=0x00;
+	device->rsa.e[2]=0x01;
+	device->rsa.e[3]=0x00;
+	while(1)
+	{
+		_rand(device->rsa.p,device->rsa.len>>1);
+		_rand(device->rsa.q,device->rsa.len>>1);
+		flag=rsa_genkey(&device->rsa,RSA_CRT);
+		if (!flag)
+			break;
+	}
+}
+
+//STEP_CONNECT
 void device_recv(device_t *device)
 {
 	//queue->route
@@ -261,16 +293,17 @@ void device_recv(device_t *device)
 		if (queue->step==STEP_CONNECT)
 		{
 			index.number=*(uint32 *)queue->data;
-			index.data=(uint32 *)(queue->data+4);
+			index.index=(uint32 *)(queue->data+1*sizeof(uint32));
+			index.key=queue->data+(1+index.number)*sizeof(uint32);
 			for (i=0;i<index.number;i++)
 			{
-				if (index.data[i]==device->device_index)
+				if (index.index[i]==device->device_index)
 					continue;
 				flag=0;
 				route=device->route;
 				while(route)
 				{
-					if (route->device_index==index.data[i])
+					if (route->device_index==index.index[i])
 					{
 						flag=1;
 						break;
@@ -281,8 +314,10 @@ void device_recv(device_t *device)
 				{
 					route=new route_t;
 					route->flag=0;
-					route->device_index=index.data[i];
+					route->device_index=index.index[i];
 					route->path=NULL;
+					memcpy(route->key.e,&index.key[i*(KEY_E+KEY_LEN)],KEY_E);
+					memcpy(route->key.n,&index.key[i*(KEY_E+KEY_LEN)+KEY_E],KEY_LEN);
 					route->next=NULL;
 					route_insert(device,route);
 				}
@@ -342,6 +377,8 @@ void device_seek(device_t *device)
 				route->flag=0;
 				route->device_index=g_device[i].device_index;
 				route->path=NULL;
+				memcpy(route->key.e,g_device[i].rsa.e,KEY_E);
+				memcpy(route->key.n,g_device[i].rsa.n,KEY_LEN);
 				route->next=NULL;
 				route_insert(device,route);
 			}
@@ -373,13 +410,20 @@ void device_send(device_t *device)
 	}
 	if (!flag)
 		return;
-	index.data=new uint32[index.number];
+	index.index=new uint32[index.number];
+	index.key=new uint8[index.number*(KEY_E+KEY_LEN)];
 	index.number=0;
-	index.data[index.number++]=device->device_index;
+	index.index[index.number]=device->device_index;
+	memcpy(&index.key[index.number*(KEY_E+KEY_LEN)],device->rsa.e,KEY_E);
+	memcpy(&index.key[index.number*(KEY_E+KEY_LEN)+KEY_E],device->rsa.n,KEY_LEN);
+	index.number++;
 	route=device->route;
 	while(route)
 	{
-		index.data[index.number++]=route->device_index;
+		index.index[index.number]=route->device_index;
+		memcpy(&index.key[index.number*(KEY_E+KEY_LEN)],route->key.e,KEY_E);
+		memcpy(&index.key[index.number*(KEY_E+KEY_LEN)+KEY_E],route->key.n,KEY_LEN);
+		index.number++;
 		route=route->next;
 	}
 	//fill route
@@ -388,13 +432,15 @@ void device_send(device_t *device)
 	{
 		queue=new queue_t;
 		queue->step=STEP_CONNECT;
-		queue->data=new uint8[(1+index.number)*sizeof(uint32)];
+		queue->data=new uint8[(1+index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN)];
 		*(uint32 *)queue->data=index.number;//align problem?
-		memcpy(queue->data+4,index.data,index.number*sizeof(uint32));
+		memcpy(queue->data+1*sizeof(uint32),index.index,index.number*sizeof(uint32));
+		memcpy(queue->data+(1+index.number)*sizeof(uint32),index.key,index.number*(KEY_E+KEY_LEN));
 		queue_insert(&g_device[route->device_index],queue);
 		route=route->next;
 	}
-	delete[] index.data;
+	delete[] index.index;
+	delete[] index.key;
 	//update queue
 	queue=new queue_t;
 	queue->step=STEP_TANGLE;

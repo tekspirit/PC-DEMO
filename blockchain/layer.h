@@ -2,6 +2,7 @@
 
 //include
 #include "include.h"
+#include "crypt_rsa.h"
 //#include "crypt_hash.h"
 //define
 #define QUEUE_LENGTH 0x20
@@ -9,19 +10,34 @@
 #define NODE_HEAVY 0
 #define NODE_LIGHT 1
 
-#define STATUS_FREE 0
-#define STATUS_MASTER 1
-#define STATUS_SLAVE 2
-
 #define STEP_CONNECT 0
 #define STEP_TANGLE 1
+
+#define KEY_LEN 4 //密钥对字节数
+#define KEY_E 4 //公钥e字节数
+#define KEY_MASK 0 //指数盲化字节数
 
 #define TIMER_CONNECT 1 //组网更新时间(重节点向服务器)
 //typedef
 //struct
-struct msg_t
+struct index_t
 {
-	uint8 type;
+	uint32 number;//待处理索引数目
+	uint32 *index;//待处理索引列表
+	uint8 *key;//待处理索引公钥
+};
+/*
+struct list_t
+{
+	uint32 dag_index;//区域索引
+	uint32 device_index;//设备索引
+	uint8 node;//0-重节点,1-轻节点
+	uint8 *key_e;//公钥
+};*/
+struct key_t
+{
+	uint8 e[KEY_E];//公钥
+	uint8 n[KEY_LEN];//模数
 };
 struct route_t
 {
@@ -29,19 +45,8 @@ struct route_t
 	uint32 device_index;//终设备索引(类似于唯一物理地址)
 	//uint32 hops;//跳跃间隔
 	uint32 *path;//路由路径
+	key_t key;//公钥
 	route_t *next;
-};
-/*
-struct index_t
-{
-	uint32 *index;//设备索引列表
-	uint32 number;//设备索引数目
-	index_t *next;
-};*/
-struct index_t
-{
-	uint32 number;//待处理索引数目
-	uint32 *data;//待处理索引列表
 };
 struct queue_t
 {
@@ -49,20 +54,11 @@ struct queue_t
 	uint8 *data;
 	queue_t *next;
 };
-struct list_t
-{
-	uint32 dag_index;//区域索引
-	uint32 device_index;//设备索引
-	uint8 node;//0-重节点,1-轻节点
-	uint8 *key_e;//公钥
-};
 struct mainchain_t
 {
 	//mainchain
-	volatile uint8 step;
 	queue_t *queue;//消息队列
-	list_t *list;
-
+	//list_t *list;
 };
 struct device_t
 {
@@ -73,7 +69,9 @@ struct device_t
 	//uint8 line;//0-在线,1-掉线
 	uint32 device_index;//设备索引(类似于唯一物理地址)
 	//volatile uint8 step;
+	route_t *route;//连接设备路由链表
 	queue_t *queue;//消息队列
+	rsa_t rsa;//当前设备的公私钥对
 	//list_t *list;//节点列表(重节点使用)
 
 	//uint8 buffer[BUFFER_LENGTH];//数据接收缓冲区
@@ -81,8 +79,8 @@ struct device_t
 
 
 
-	uint8 status;//0-作为free,1-作为master,2-作为slave
-	route_t *route;//连接设备路由链表
+	//uint8 status;//0-作为free,1-作为master,2-作为slave
+	
 /*
 	//index_t *index;//设备索引链表
 	//dag
