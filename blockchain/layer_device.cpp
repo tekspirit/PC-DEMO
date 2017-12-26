@@ -1,10 +1,11 @@
 #include "layer_device.h"
 
-extern uint32 g_devicenum;//设备个数
+extern uint32 g_devicenum[2];//设备个数
 extern uint32 g_devicerange;//设备坐标范围
 extern uint32 g_devicestep;//设备步进值
 extern CRITICAL_SECTION g_cs;
 extern device_t *g_device;//设备数组
+extern mainchain_t g_mainchain;//主链
 extern volatile uint8 g_task;//传递给线程的过程标记
 extern volatile uint8 *g_init;//每个线程的初始化任务.0-未初始化,1-已初始化
 
@@ -224,6 +225,13 @@ void queue_insert(device_t *device,queue_t *queue)
 	device->queue=queue;
 }
 
+//queue insert into mainchain->queue
+void queue_insert(mainchain_t *mainchain,queue_t *queue)
+{
+	queue->next=mainchain->queue;
+	mainchain->queue=queue;
+}
+
 //queue delete from device->queue
 void queue_delete(device_t *device)
 {
@@ -295,6 +303,7 @@ void device_recv(device_t *device)
 			index.number=*(uint32 *)queue->data;
 			index.index=(uint32 *)(queue->data+1*sizeof(uint32));
 			index.key=queue->data+(1+index.number)*sizeof(uint32);
+			index.node=queue->data+(1+index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN);
 			for (i=0;i<index.number;i++)
 			{
 				if (index.index[i]==device->device_index)
@@ -318,6 +327,7 @@ void device_recv(device_t *device)
 					route->path=NULL;
 					memcpy(route->key.e,&index.key[i*(KEY_E+KEY_LEN)],KEY_E);
 					memcpy(route->key.n,&index.key[i*(KEY_E+KEY_LEN)+KEY_E],KEY_LEN);
+					route->node=index.node[i];
 					route->next=NULL;
 					route_insert(device,route);
 				}
@@ -354,7 +364,7 @@ void device_seek(device_t *device)
 	uint8 flag;
 	route_t *route;
 
-	for (i=0;i<g_devicenum;i++)
+	for (i=0;i<g_devicenum[0]+g_devicenum[1];i++)
 	{
 		if (i==device->device_index)
 			continue;
@@ -379,6 +389,7 @@ void device_seek(device_t *device)
 				route->path=NULL;
 				memcpy(route->key.e,g_device[i].rsa.e,KEY_E);
 				memcpy(route->key.n,g_device[i].rsa.n,KEY_LEN);
+				route->node=g_device[i].node;
 				route->next=NULL;
 				route_insert(device,route);
 			}
@@ -388,7 +399,7 @@ void device_seek(device_t *device)
 
 void device_send(device_t *device)
 {
-	//route->queue
+	//route->queue(device/mainchain)
 	uint8 flag;
 	route_t *route;
 	queue_t *queue;
@@ -412,10 +423,12 @@ void device_send(device_t *device)
 		return;
 	index.index=new uint32[index.number];
 	index.key=new uint8[index.number*(KEY_E+KEY_LEN)];
+	index.node=new uint8[index.number];
 	index.number=0;
 	index.index[index.number]=device->device_index;
 	memcpy(&index.key[index.number*(KEY_E+KEY_LEN)],device->rsa.e,KEY_E);
 	memcpy(&index.key[index.number*(KEY_E+KEY_LEN)+KEY_E],device->rsa.n,KEY_LEN);
+	index.node[index.number]=device->node;
 	index.number++;
 	route=device->route;
 	while(route)
@@ -423,6 +436,7 @@ void device_send(device_t *device)
 		index.index[index.number]=route->device_index;
 		memcpy(&index.key[index.number*(KEY_E+KEY_LEN)],route->key.e,KEY_E);
 		memcpy(&index.key[index.number*(KEY_E+KEY_LEN)+KEY_E],route->key.n,KEY_LEN);
+		index.node[index.number]=route->node;
 		index.number++;
 		route=route->next;
 	}
@@ -432,13 +446,24 @@ void device_send(device_t *device)
 	{
 		queue=new queue_t;
 		queue->step=STEP_CONNECT;
-		queue->data=new uint8[(1+index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN)];
+		queue->data=new uint8[(1+index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN)+index.number];
 		*(uint32 *)queue->data=index.number;//align problem?
 		memcpy(queue->data+1*sizeof(uint32),index.index,index.number*sizeof(uint32));
 		memcpy(queue->data+(1+index.number)*sizeof(uint32),index.key,index.number*(KEY_E+KEY_LEN));
+		memcpy(queue->data+(1+index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN),index.node,index.number);
 		queue_insert(&g_device[route->device_index],queue);
 		route=route->next;
 	}
+	//fill mainchain
+	queue=new queue_t;
+	queue->step=STEP_CONNECT;
+	queue->data=new uint8[(1+index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN)+index.number];
+	*(uint32 *)queue->data=index.number;//align problem?
+	memcpy(queue->data+1*sizeof(uint32),index.index,index.number*sizeof(uint32));
+	memcpy(queue->data+(1+index.number)*sizeof(uint32),index.key,index.number*(KEY_E+KEY_LEN));
+	memcpy(queue->data+(1+index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN),index.node,index.number);
+	queue_insert(&g_mainchain,queue);
+	//release
 	delete[] index.index;
 	delete[] index.key;
 	//update queue

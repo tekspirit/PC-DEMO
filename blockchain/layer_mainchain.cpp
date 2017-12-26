@@ -1,7 +1,110 @@
 #include "layer_mainchain.h"
 
-void process_mainchain(device_t *device)
+//STEP_CONNECT
+void mainchain_recv(mainchain_t *mainchain)
 {
+#if 0
+	//queue->list
+	uint32 i;
+	uint8 flag;
+	queue_t *queue,*prev;
+	index_t index;
+
+	queue=mainchain->queue;
+	while(queue)
+	{
+		//find latest queue
+		if (queue->step==STEP_CONNECT)
+		{
+			index.number=*(uint32 *)queue->data;
+			index.index=(uint32 *)(queue->data+1*sizeof(uint32));
+			index.key=queue->data+(1+index.number)*sizeof(uint32);
+			index.node=queue->data+(1+index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN);
+			for (i=0;i<mainchain->number;i++)
+				if (
+			if (!mainchain->number)
+				mainchain->list=(list_t *)malloc(index.number*sizeof(list_t));
+			else
+				mainchain->list=(list_t *)realloc(index.number*sizeof(list_t));
+		}
+		//delete all queues with same device_index
+
+
+			for (i=0;i<index.number;i++)
+			{
+				if (index.index[i]==mainchain->device_index)
+					continue;
+				//
+
+				flag=0;
+				route=device->route;
+				while(route)
+				{
+					if (route->device_index==index.index[i])
+					{
+						flag=1;
+						break;
+					}
+					route=route->next;
+				}
+				if (!flag)
+				{
+					route=new route_t;
+					route->flag=0;
+					route->device_index=index.index[i];
+					route->path=NULL;
+					memcpy(route->key.e,&index.key[i*(KEY_E+KEY_LEN)],KEY_E);
+					memcpy(route->key.n,&index.key[i*(KEY_E+KEY_LEN)+KEY_E],KEY_LEN);
+					route->node=index.node[i];
+					route->next=NULL;
+					route_insert(device,route);
+				}
+			}
+			if (queue==device->queue)
+			{
+				device->queue=queue->next;
+				if (queue->data)
+					delete[] queue->data;
+				delete queue;
+				queue=device->queue;
+			}
+			else
+			{
+				prev->next=queue->next;
+				if (queue->data)
+					delete[] queue->data;
+				delete queue;
+				queue=prev->next;
+			}
+		}
+		else
+		{
+			prev=queue;
+			queue=queue->next;
+		}
+	}
+#endif
+}
+
+void mainchain_send(mainchain_t *mainchain)
+{
+}
+
+void process_mainchain(mainchain_t *mainchain)
+{
+	if (!mainchain->queue)
+		return;
+	switch(mainchain->queue->step)
+	{
+	case STEP_CONNECT:
+		//recv
+		mainchain_recv(mainchain);//recv & process mainchain's route
+		//send
+		mainchain_send(mainchain);//pack & send mainchain's queue
+		break;
+	case STEP_TANGLE:
+		break;
+	}
 }
 
 #if 0

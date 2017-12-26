@@ -26,6 +26,7 @@ void print_route(void);
 void route_insert(device_t *device,route_t *route);
 void route_delete(device_t *device);
 void queue_insert(device_t *device,queue_t *queue);
+void queue_insert(mainchain_t *mainchain,queue_t *queue);
 void queue_delete(device_t *device);
 void key_generate(device_t *device);
 void device_recv(device_t *device);

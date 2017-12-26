@@ -25,19 +25,19 @@ struct index_t
 	uint32 number;//待处理索引数目
 	uint32 *index;//待处理索引列表
 	uint8 *key;//待处理索引公钥
+	uint8 *node;//0-重节点,1-轻节点
 };
-/*
-struct list_t
-{
-	uint32 dag_index;//区域索引
-	uint32 device_index;//设备索引
-	uint8 node;//0-重节点,1-轻节点
-	uint8 *key_e;//公钥
-};*/
 struct key_t
 {
 	uint8 e[KEY_E];//公钥
 	uint8 n[KEY_LEN];//模数
+};
+struct list_t
+{
+	uint32 dag_index;//区域索引
+	uint32 device_index;//设备索引
+	key_t key;//公钥
+	uint8 node;//0-重节点,1-轻节点
 };
 struct route_t
 {
@@ -46,6 +46,7 @@ struct route_t
 	//uint32 hops;//跳跃间隔
 	uint32 *path;//路由路径
 	key_t key;//公钥
+	uint8 node;//0-重节点,1-轻节点
 	route_t *next;
 };
 struct queue_t
@@ -56,39 +57,27 @@ struct queue_t
 };
 struct mainchain_t
 {
-	//mainchain
 	queue_t *queue;//消息队列
-	//list_t *list;
+	uint32 number;//节点数目
+	list_t *list;//节点属性列表
 };
 struct device_t
 {
-	//device
 	uint32 x;
 	uint32 y;
 	uint8 node;//0-重节点(区域账本),1-轻节点(无账本)
-	//uint8 line;//0-在线,1-掉线
 	uint32 device_index;//设备索引(类似于唯一物理地址)
-	//volatile uint8 step;
 	route_t *route;//连接设备路由链表
 	queue_t *queue;//消息队列
 	rsa_t rsa;//当前设备的公私钥对
-	//list_t *list;//节点列表(重节点使用)
-
-	//uint8 buffer[BUFFER_LENGTH];//数据接收缓冲区
-
-
-
-
+	//uint8 line;//0-在线,1-掉线
+	//volatile uint8 step;
 	//uint8 status;//0-作为free,1-作为master,2-作为slave
 	
 /*
 	//index_t *index;//设备索引链表
 	//dag
 	volatile uint32 dag_index;//子链索引.0-孤立点,其他-索引号
-
-
-	
-
 	uint8 status;//0-作为free,1-作为master,2-作为slave
 	route_t *route;//连接设备路由链表
 	//queue_t queue[QUEUE_LENGTH];//设备的消息队列(发送/接收)

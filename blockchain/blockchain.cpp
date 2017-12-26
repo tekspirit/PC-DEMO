@@ -2,13 +2,14 @@
 
 ////global var
 //device
-uint32 g_devicenum;//设备个数
+uint32 g_devicenum[2];//设备个数.0-重节点,1-轻节点
 uint32 g_devicerange;//设备坐标范围
 uint32 g_devicestep;//设备步进值
 //dag
 //common
 CRITICAL_SECTION g_cs;
-device_t *g_device,g_mainchain;//设备数组
+device_t *g_device;//设备数组
+mainchain_t g_mainchain;//主链
 volatile uint32 g_index;//临时用来统计交易号码的(以后会用hash_t代替,计数从1开始)
 volatile uint8 g_task;//传递给线程的过程标记
 volatile uint8 *g_init;//每个线程的初始化任务.0-未初始化,1-已初始化
@@ -18,13 +19,13 @@ CString g_string[9]={"none","device_initial","device_connect","device_merge","de
 //主链线程
 uint32 WINAPI thread_mainchain(PVOID pParam)
 {
-	device_t *device;
+	mainchain_t *mainchain;
 
-	device=(device_t *)pParam;
+	mainchain=(mainchain_t *)pParam;
 	while(1)
 	{
 		EnterCriticalSection(&g_cs);
-		process_mainchain(device);
+		process_mainchain(mainchain);
 		//printf("initial thread_mainchain pass\r\n");
 		LeaveCriticalSection(&g_cs);
 	}
@@ -70,7 +71,10 @@ void main(int argc,char* argv[])
 	fgets(buf,1000,file);//[network]
 	fgets(buf,1000,file);
 	buf[strlen(buf)-1]=0;
-	g_devicenum=atol(&buf[11]);//g_devicenum
+	g_devicenum[0]=atol(&buf[13]);//g_devicenum[0]
+	fgets(buf,1000,file);
+	buf[strlen(buf)-1]=0;
+	g_devicenum[1]=atol(&buf[13]);//g_devicenum[1]
 	fgets(buf,1000,file);
 	buf[strlen(buf)-1]=0;
 	g_devicerange=atol(&buf[13]);//g_devicerange
@@ -94,16 +98,13 @@ void main(int argc,char* argv[])
 	memset((void *)g_init,0,g_devicenum*sizeof(uint8));
 	g_flag=new uint8[g_devicenum];
 	memset((void *)g_flag,TASK_DEVICE_INITIAL,g_devicenum*sizeof(uint8));*/
-	g_device=new device_t[g_devicenum];
-	for (i=0;i<g_devicenum;i++)
+	g_device=new device_t[g_devicenum[0]+g_devicenum[1]];
+	for (i=0;i<g_devicenum[0]+g_devicenum[1];i++)
 	{
 		g_device[i].x=rand()%g_devicerange;
 		g_device[i].y=rand()%g_devicerange;
-		g_device[i].node=NODE_HEAVY;//rand()%2 ? DEVICE_NODE_LIGHT : DEVICE_NODE_HEAVY;
-		//g_device[i].line=DEVICE_LINE_ON;
+		g_device[i].node=i<g_devicenum[0] ? NODE_HEAVY : NODE_LIGHT;//rand()%2 ? NODE_LIGHT : NODE_HEAVY;
 		g_device[i].device_index=i;
-		//g_device[i].status=STATUS_FREE;
-		//g_device[i].step=STEP_CONNECT;
 		g_device[i].route=NULL;
 		g_device[i].queue=NULL;
 		queue=new queue_t;
@@ -114,6 +115,9 @@ void main(int argc,char* argv[])
 		key_generate(&g_device[i]);
 
 
+		//g_device[i].line=DEVICE_LINE_ON;
+		//g_device[i].status=STATUS_FREE;
+		//g_device[i].step=STEP_CONNECT;
 		//g_device[i].dag_index=0;
 		//memset((void *)g_device[i].buffer,0,BUFFER_LENGTH*sizeof(uint8));
 		/*
@@ -137,6 +141,14 @@ void main(int argc,char* argv[])
 			return;
 		}
 	}
+	g_mainchain.queue=NULL;
+	queue=new queue_t;
+	queue->step=STEP_CONNECT;
+	queue->data=new uint8[1*sizeof(uint32)];
+	*(uint32 *)queue->data=0;//align problem?
+	queue_insert(&g_mainchain,queue);
+	g_mainchain.number=0;
+	g_mainchain.list=NULL;
 	thread_handle=CreateThread(NULL,0,thread_mainchain,(PVOID)&g_mainchain,0,&thread_id);
 	if (!thread_handle)
 	{
@@ -149,7 +161,7 @@ void main(int argc,char* argv[])
 #if 1
 		EnterCriticalSection(&g_cs);
 		flag=0;
-		for (i=0;i<g_devicenum;i++)
+		for (i=0;i<g_devicenum[0]+g_devicenum[1];i++)
 			if (g_device[i].queue && g_device[i].queue->step==STEP_CONNECT)
 			{
 				flag=1;
