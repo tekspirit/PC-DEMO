@@ -142,12 +142,8 @@ void main(int argc,char* argv[])
 		}
 	}
 	g_mainchain.queue=NULL;
-	queue=new queue_t;
-	queue->step=STEP_CONNECT;
-	queue->data=new uint8[1*sizeof(uint32)];
-	*(uint32 *)queue->data=0;//align problem?
-	queue_insert(&g_mainchain,queue);
-	g_mainchain.number=0;
+	g_mainchain.dag_nummber=0;
+	g_mainchain.list_number=0;
 	g_mainchain.list=NULL;
 	thread_handle=CreateThread(NULL,0,thread_mainchain,(PVOID)&g_mainchain,0,&thread_id);
 	if (!thread_handle)

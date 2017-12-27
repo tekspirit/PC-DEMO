@@ -149,7 +149,10 @@ void device_release(device_t *device)
 	{
 		point=route->next;
 		if (route->path)
+		{
 			delete[] route->path;
+			route->path=NULL;
+		}
 		delete route;
 		route=point;
 	}
@@ -240,7 +243,10 @@ void queue_delete(device_t *device)
 	queue=device->queue;
 	device->queue=queue->next;
 	if (queue->data)
+	{
 		delete[] queue->data;
+		queue->data=NULL;
+	}
 	delete queue;
 }
 
@@ -249,7 +255,10 @@ void queue_delete(queue_t *prev,queue_t *queue)
 	//delete queue
 	prev->next=queue->next;
 	if (queue->data)
+	{
 		delete[] queue->data;
+		queue->data=NULL;
+	}
 	delete queue;
 }
 
@@ -336,7 +345,10 @@ void device_recv(device_t *device)
 			{
 				device->queue=queue->next;
 				if (queue->data)
+				{
 					delete[] queue->data;
+					queue->data=NULL;
+				}
 				delete queue;
 				queue=device->queue;
 			}
@@ -344,7 +356,10 @@ void device_recv(device_t *device)
 			{
 				prev->next=queue->next;
 				if (queue->data)
+				{
 					delete[] queue->data;
+					queue->data=NULL;
+				}
 				delete queue;
 				queue=prev->next;
 			}

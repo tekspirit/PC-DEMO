@@ -58,7 +58,8 @@ struct queue_t
 struct mainchain_t
 {
 	queue_t *queue;//消息队列
-	uint32 number;//节点数目
+	uint32 dag_number;//区域数目
+	uint32 list_number;//节点数目
 	list_t *list;//节点属性列表
 };
 struct device_t
