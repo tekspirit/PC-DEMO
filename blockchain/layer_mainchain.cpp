@@ -1,11 +1,5 @@
 #include "layer_mainchain.h"
 
-void list_delete(mainchain_t *mainchain)
-{
-	if (mainchain->list)
-		delete[] mainchain->list;
-}
-
 //STEP_CONNECT
 void mainchain_recv(mainchain_t *mainchain)
 {
@@ -14,89 +8,97 @@ void mainchain_recv(mainchain_t *mainchain)
 	uint32 dag_index;
 	uint32 *dag;
 	uint8 flag;
-	queue_t *queue,*remove;
+	queue_t *queue,*remove,*prev;
 	index_t index;
 	list_t *list;
 
-	queue=mainchain->queue;
-	while(queue)
+	flag=0;
+	while(1)
 	{
-		//find latest queue
-		if (queue->step==STEP_CONNECT)
+		queue=mainchain->queue;
+		while(queue)
 		{
-			index.number=*(uint32 *)queue->data;
-			index.index=(uint32 *)(queue->data+1*sizeof(uint32));
-			index.key=queue->data+(1+index.number)*sizeof(uint32);
-			index.node=queue->data+(1+index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN);
-			//compute list_number
-			dag_index=mainchain->dag_number;
-			for (j=0;j<index.number;j++)
-			{
-				for (i=0;i<mainchain->list_number;i++)
-					if (mainchain->list[i].device_index==index.index[j])
-						break;
-				if (i!=mainchain->list_number)
-				{
-					dag_index=mainchain->list[i].dag_index;
-					break;
-				}
-			}
-			k=index.number;
-			for (j=0;j<mainchain->list_number;j++)
-			{
-				for (i=0;i<index.number;i++)
-					if (index.index[i]==mainchain->list[j].device_index)
-						break;
-				if (i==index.number && dag_index!=mainchain->list[j].dag_index)//other device_index & different dag_index
-					k++;
-			}
-			//fill list
-			list=new list_t[k];
-			for (i=0;i<index.number;i++)
-			{
-				list[i].dag_index=dag_index;
-				list[i].device_index=index.index[i];
-				memcpy(list[i].key.e,&index.key[i*(KEY_E+KEY_LEN)],KEY_E);
-				memcpy(list[i].key.n,&index.key[i*(KEY_E+KEY_LEN)+KEY_E],KEY_LEN);
-				list[i].node=index.node[i];
-			}
-			k=index.number;
-			for (j=0;j<mainchain->list_number;j++)
-			{
-				for (i=0;i<index.number;i++)
-					if (index.index[i]==mainchain->list[j].device_index)
-						break;
-				if (i==index.number && dag_index!=mainchain->list[j].dag_index)//other device_index & different dag_index
-				{
-					list[k].dag_index=mainchain->list[j].dag_index;
-					list[k].device_index=mainchain->list[j].device_index;
-					memcpy(list[k].key.e,&mainchain->list[j].key.e,KEY_E);
-					memcpy(list[k].key.n,&mainchain->list[j].key.n,KEY_LEN);
-					list[k].node=mainchain->list[j].node;
-					k++;
-				}
-			}
-			if (mainchain->list)
-				delete[] mainchain->list;
-			mainchain->list=new list_t[k];
-			memcpy(mainchain->list,list,k*sizeof(list_t));
-			delete[] list;
-			mainchain->list_number=k;
-			//compute dag_number
-			mainchain->dag_number=0;
+			if (queue->step==STEP_CONNECT)
+				break;
+			queue=queue->next;
+		}
+		if (!queue)
+			break;
+		flag=1;
+		//find latest/first queue
+		index.number=*(uint32 *)queue->data;
+		index.index=(uint32 *)(queue->data+1*sizeof(uint32));
+		index.key=queue->data+(1+index.number)*sizeof(uint32);
+		index.node=queue->data+(1+index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN);
+		//compute list_number
+		dag_index=mainchain->dag_number;
+		for (j=0;j<index.number;j++)
+		{
 			for (i=0;i<mainchain->list_number;i++)
+				if (mainchain->list[i].device_index==index.index[j])
+					break;
+			if (i!=mainchain->list_number)
 			{
-				for (j=0;j<mainchain->dag_number;j++)
-					if (mainchain->list[i].dag_index==dag[j])
-						break;
-				if (j==mainchain->dag_number)
-				{
-					dag=j ? (uint32 *)realloc((j+1)*sizeof(uint32)) : (uint32 *)malloc((j+1)*sizeof(uint32));
-					dag[j]=j;
-					mainchain->dag_number++;
-				}
+				dag_index=mainchain->list[i].dag_index;
+				break;
 			}
 		}
+		k=index.number;
+		for (j=0;j<mainchain->list_number;j++)
+		{
+			for (i=0;i<index.number;i++)
+				if (index.index[i]==mainchain->list[j].device_index)
+					break;
+			if (i==index.number && dag_index!=mainchain->list[j].dag_index)//other device_index & different dag_index
+				k++;
+		}
+		//fill list
+		list=new list_t[k];
+		for (i=0;i<index.number;i++)
+		{
+			list[i].dag_index=dag_index;
+			list[i].device_index=index.index[i];
+			memcpy(list[i].key.e,&index.key[i*(KEY_E+KEY_LEN)],KEY_E);
+			memcpy(list[i].key.n,&index.key[i*(KEY_E+KEY_LEN)+KEY_E],KEY_LEN);
+			list[i].node=index.node[i];
+		}
+		k=index.number;
+		for (j=0;j<mainchain->list_number;j++)
+		{
+			for (i=0;i<index.number;i++)
+				if (index.index[i]==mainchain->list[j].device_index)
+					break;
+			if (i==index.number && dag_index!=mainchain->list[j].dag_index)//other device_index & different dag_index
+			{
+				list[k].dag_index=mainchain->list[j].dag_index;
+				list[k].device_index=mainchain->list[j].device_index;
+				memcpy(list[k].key.e,&mainchain->list[j].key.e,KEY_E);
+				memcpy(list[k].key.n,&mainchain->list[j].key.n,KEY_LEN);
+				list[k].node=mainchain->list[j].node;
+				k++;
+			}
+		}
+		list_delete(mainchain);
+		mainchain->list=new list_t[k];
+		memcpy(mainchain->list,list,k*sizeof(list_t));
+		delete[] list;
+		mainchain->list_number=k;
+		//compute dag_number
+		mainchain->dag_number=0;
+		for (i=0;i<mainchain->list_number;i++)
+		{
+			for (j=0;j<mainchain->dag_number;j++)
+				if (mainchain->list[i].dag_index==dag[j])
+					break;
+			if (j==mainchain->dag_number)
+			{
+				dag=j ? (uint32 *)realloc(dag,(j+1)*sizeof(uint32)) : (uint32 *)malloc((j+1)*sizeof(uint32));
+				dag[j]=j;
+				mainchain->dag_number++;
+			}
+		}
+		if (mainchain->dag_number)
+			free(dag);
 		//delete all queues with same device_index
 		remove=queue;
 		while(remove)
@@ -132,74 +134,14 @@ void mainchain_recv(mainchain_t *mainchain)
 				remove=remove->next;
 			}
 		}
-		queue=queue->next;//dingy problem
 	}
-
-
-
-
-
-
-
-
-			for (i=0;i<index.number;i++)
-			{
-				if (index.index[i]==mainchain->device_index)
-					continue;
-				//
-
-				flag=0;
-				route=device->route;
-				while(route)
-				{
-					if (route->device_index==index.index[i])
-					{
-						flag=1;
-						break;
-					}
-					route=route->next;
-				}
-				if (!flag)
-				{
-					route=new route_t;
-					route->flag=0;
-					route->device_index=index.index[i];
-					route->path=NULL;
-					memcpy(route->key.e,&index.key[i*(KEY_E+KEY_LEN)],KEY_E);
-					memcpy(route->key.n,&index.key[i*(KEY_E+KEY_LEN)+KEY_E],KEY_LEN);
-					route->node=index.node[i];
-					route->next=NULL;
-					route_insert(device,route);
-				}
-			}
-			if (queue==device->queue)
-			{
-				device->queue=queue->next;
-				if (queue->data)
-				{
-					delete[] queue->data;
-					queue->data=NULL;
-				}
-				delete queue;
-				queue=device->queue;
-			}
-			else
-			{
-				prev->next=queue->next;
-				if (queue->data)
-				{
-					delete[] queue->data;
-					queue->data=NULL;
-				}
-				delete queue;
-				queue=prev->next;
-			}
-		}
-		else
-		{
-			prev=queue;
-			queue=queue->next;
-		}
+	//update queue
+	if (flag)
+	{
+		queue=new queue_t;
+		queue->step=STEP_TANGLE;
+		queue->data=NULL;
+		queue_insert(mainchain,queue);
 	}
 }
 
@@ -216,8 +158,6 @@ void process_mainchain(mainchain_t *mainchain)
 	case STEP_CONNECT:
 		//recv
 		mainchain_recv(mainchain);//recv & process mainchain's route
-		//send
-		mainchain_send(mainchain);//pack & send mainchain's queue
 		break;
 	case STEP_TANGLE:
 		break;

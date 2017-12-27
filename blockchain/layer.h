@@ -44,7 +44,7 @@ struct route_t
 	uint8 flag;//0-未连接,1-连接
 	uint32 device_index;//终设备索引(类似于唯一物理地址)
 	//uint32 hops;//跳跃间隔
-	uint32 *path;//路由路径
+	//uint32 *path;//路由路径
 	key_t key;//公钥
 	uint8 node;//0-重节点,1-轻节点
 	route_t *next;
@@ -98,3 +98,10 @@ struct device_t
 	*/
 };
 //function
+void route_insert(device_t *device,route_t *route);
+void route_delete(device_t *device);
+void queue_insert(device_t *device,queue_t *queue);
+void queue_insert(mainchain_t *mainchain,queue_t *queue);
+void queue_delete(device_t *device);
+void list_delete(mainchain_t *mainchain);
+void key_generate(device_t *device);

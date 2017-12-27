@@ -101,6 +101,7 @@ void main(int argc,char* argv[])
 	g_device=new device_t[g_devicenum[0]+g_devicenum[1]];
 	for (i=0;i<g_devicenum[0]+g_devicenum[1];i++)
 	{
+		EnterCriticalSection(&g_cs);
 		g_device[i].x=rand()%g_devicerange;
 		g_device[i].y=rand()%g_devicerange;
 		g_device[i].node=i<g_devicenum[0] ? NODE_HEAVY : NODE_LIGHT;//rand()%2 ? NODE_LIGHT : NODE_HEAVY;
@@ -113,6 +114,7 @@ void main(int argc,char* argv[])
 		*(uint32 *)queue->data=0;//align problem?
 		queue_insert(&g_device[i],queue);
 		key_generate(&g_device[i]);
+		LeaveCriticalSection(&g_cs);
 
 
 		//g_device[i].line=DEVICE_LINE_ON;
@@ -142,7 +144,7 @@ void main(int argc,char* argv[])
 		}
 	}
 	g_mainchain.queue=NULL;
-	g_mainchain.dag_nummber=0;
+	g_mainchain.dag_number=0;
 	g_mainchain.list_number=0;
 	g_mainchain.list=NULL;
 	thread_handle=CreateThread(NULL,0,thread_mainchain,(PVOID)&g_mainchain,0,&thread_id);
@@ -157,6 +159,8 @@ void main(int argc,char* argv[])
 #if 1
 		EnterCriticalSection(&g_cs);
 		flag=0;
+		if (g_mainchain.queue && g_mainchain.queue->step==STEP_CONNECT)
+			flag=1;
 		for (i=0;i<g_devicenum[0]+g_devicenum[1];i++)
 			if (g_device[i].queue && g_device[i].queue->step==STEP_CONNECT)
 			{
