@@ -7,6 +7,5 @@
 //typedef
 //struct
 //function
-void mainchain_recv(mainchain_t *mainchain);
-void mainchain_send(mainchain_t *mainchain);
+void connect_recv(mainchain_t *mainchain);
 void process_mainchain(mainchain_t *mainchain);

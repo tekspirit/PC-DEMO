@@ -5,18 +5,28 @@
 #include "crypt_rsa.h"
 //#include "crypt_hash.h"
 //define
-#define QUEUE_LENGTH 0x20
-
 #define NODE_HEAVY 0
 #define NODE_LIGHT 1
 
 #define STEP_CONNECT 0
-#define STEP_TANGLE 1
+#define STEP_TRANSACTION 1
+#define STEP_TANGLE 2
+#define STEP_MOVE 3
 
 #define KEY_LEN 4 //密钥对字节数
 #define KEY_E 4 //公钥e字节数
 #define KEY_MASK 0 //指数盲化字节数
 
+#define TRANSACTION_NORMAL 0 //普通交易
+#define TRANSACTION_VALUE 1 //有价交易(需账本验证)
+/*
+#define TAG_NONE 0 //未交易认证transaction
+#define TRANSACTION_TIP 1 //已链入tangle成为tip
+#define TRANSACTION_TANGLE 2 //已链入tangle并被其他交易指引
+#define TRANSACTION_SOLID 3 //已交易认证transaction
+#define TRANSACTION_MILESTONE 4 //已账本验证milestone
+//#define QUEUE_LENGTH 0x20
+*/
 #define TIMER_CONNECT 1 //组网更新时间(重节点向服务器)
 //typedef
 //struct
@@ -71,10 +81,6 @@ struct device_t
 	route_t *route;//连接设备路由链表
 	queue_t *queue;//消息队列
 	rsa_t rsa;//当前设备的公私钥对
-	//uint8 line;//0-在线,1-掉线
-	//volatile uint8 step;
-	//uint8 status;//0-作为free,1-作为master,2-作为slave
-	
 /*
 	//index_t *index;//设备索引链表
 	//dag
@@ -89,9 +95,6 @@ struct device_t
 	volatile uint32 tangle_index;//主tangle索引长度
 	transaction_t transaction[TRANSACTION_LENGTH];//transaction队列
 	volatile uint32 transaction_index;//transaction索引长度
-	key_t key[DEVICE_LENGTH];//key公钥队列
-	volatile uint32 key_index;//key索引长度
-	uint8 pair[300*4];//密钥对rsa=1(e)+64(n)+64(d)+32(p)+32(q)+32(dp)+32(dq)+32(qp)=289 word
 	//application
 	uint32 account_id;//账户id
 	uint32 account_money;//账户现金

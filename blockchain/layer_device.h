@@ -23,7 +23,7 @@ void device_release(device_t *device);
 void print_status(void);
 void print_route(void);
 */
-void device_recv(device_t *device);
-void device_seek(device_t *device);
-void device_send(device_t *device);
+void connect_recv(device_t *device);
+void connect_seek(device_t *device);
+void connect_send(device_t *device);
 void process_device(device_t *device);

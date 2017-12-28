@@ -1,7 +1,7 @@
 #include "layer_mainchain.h"
 
 //STEP_CONNECT
-void mainchain_recv(mainchain_t *mainchain)
+void connect_recv(mainchain_t *mainchain)
 {
 	//queue->list
 	uint32 i,j,k;
@@ -139,13 +139,14 @@ void mainchain_recv(mainchain_t *mainchain)
 	if (flag)
 	{
 		queue=new queue_t;
-		queue->step=STEP_TANGLE;
+		queue->step=STEP_TRANSACTION;
 		queue->data=NULL;
 		queue_insert(mainchain,queue);
 	}
 }
 
-void mainchain_send(mainchain_t *mainchain)
+//STEP_TRANSACTION
+void transaction_recv(mainchain_t *mainchain)
 {
 }
 
@@ -157,9 +158,11 @@ void process_mainchain(mainchain_t *mainchain)
 	{
 	case STEP_CONNECT:
 		//recv
-		mainchain_recv(mainchain);//recv & process mainchain's route
+		connect_recv(mainchain);//recv queue & process mainchain's list
 		break;
-	case STEP_TANGLE:
+	case STEP_TRANSACTION:
+		//recv
+		transaction_recv(mainchain);//recv queue & process mainchain's
 		break;
 	}
 }

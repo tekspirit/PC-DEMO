@@ -1,20 +1,14 @@
 #include "blockchain.h"
 
-////global var
-//device
+//global var
 uint32 g_devicenum[2];//设备个数.0-重节点,1-轻节点
 uint32 g_devicerange;//设备坐标范围
 uint32 g_devicestep;//设备步进值
-//dag
-//common
 CRITICAL_SECTION g_cs;
 device_t *g_device;//设备数组
 mainchain_t g_mainchain;//主链
 volatile uint32 g_index;//临时用来统计交易号码的(以后会用hash_t代替,计数从1开始)
-volatile uint8 g_task;//传递给线程的过程标记
-volatile uint8 *g_init;//每个线程的初始化任务.0-未初始化,1-已初始化
-volatile uint8 *g_flag;//每个线程的当前任务标记
-CString g_string[9]={"none","device_initial","device_connect","device_merge","device_optimize","device_indexdag","device_walk","dag_initial","dag_tangle"};
+CString g_string[9]={"none","device_connect","mainchain_connect","device_transaction","mainchain_transaction","device_walk","dag_tangle"};
 
 //主链线程
 uint32 WINAPI thread_mainchain(PVOID pParam)
@@ -91,13 +85,8 @@ void main(int argc,char* argv[])
 	fclose(file);
 	//0.initial device/timer/thread_device/thread_mainchain/cs
 	InitializeCriticalSection(&g_cs);
-	srand((unsigned)time(NULL));/*
+	srand((unsigned)time(NULL));
 	g_index=0;
-	g_task=TASK_DEVICE_INITIAL;
-	g_init=new uint8[g_devicenum];
-	memset((void *)g_init,0,g_devicenum*sizeof(uint8));
-	g_flag=new uint8[g_devicenum];
-	memset((void *)g_flag,TASK_DEVICE_INITIAL,g_devicenum*sizeof(uint8));*/
 	g_device=new device_t[g_devicenum[0]+g_devicenum[1]];
 	for (i=0;i<g_devicenum[0]+g_devicenum[1];i++)
 	{

@@ -6,195 +6,9 @@ extern uint32 g_devicestep;//设备步进值
 extern CRITICAL_SECTION g_cs;
 extern device_t *g_device;//设备数组
 extern mainchain_t g_mainchain;//主链
-extern volatile uint8 g_task;//传递给线程的过程标记
-extern volatile uint8 *g_init;//每个线程的初始化任务.0-未初始化,1-已初始化
-
-#if 0
-
-void route_mark(device_t *device,uint32 device_index)
-{
-	route_t *route;
-
-	route=device->route;
-	while(route)
-	{
-		if (route->device_index==device_index)
-		{
-			route->flag=1;
-			break;
-		}
-		route=route->next;
-	}
-}
-
-route_t *route_check(device_t *device)
-{
-	route_t *route;
-
-	route=device->route;
-	while(route)
-	{
-		if (!route->flag)
-			break;
-		route=route->next;
-	}
-
-	return route;
-}
-
-route_t *route_exist(device_t *device,uint32 index)
-{
-	route_t *route;
-
-	route=device->route;
-	while(route)
-	{
-		if (route->device_index==index)
-			break;
-		route=route->next;
-	}
-
-	return route;
-}
-
-
-
-void device_recurse(device_t *device)
-{
-	//recursive seek/malloc route
-	uint8 flag;//0-new,1-update,2-abort
-	route_t *route,*point[3];
-
-	point[0]=device->route;
-	while(point[0])
-	{
-		point[1]=g_device[point[0]->device_index].route;
-		while(point[1])
-		{
-			if (point[1]->device_index!=device->device_index)
-			{
-				flag=0;
-				point[2]=device->route;
-				while(point[2])
-				{
-					if (point[1]->device_index==point[2]->device_index)
-					{
-						flag=point[0]->hops+1<point[2]->hops ? 1 : 2;
-						break;
-					}
-					point[2]=point[2]->next;
-				}
-				switch(flag)
-				{
-				case 0:
-					route=new route_t;
-					route->flag=0;
-					route->device_index=point[1]->device_index;
-					route->hops=point[0]->hops+1;
-					route->path=new uint32[point[0]->hops];
-					memcpy(route->path,point[0]->path,(point[0]->hops-1)*sizeof(uint32));
-					route->path[point[0]->hops-1]=point[0]->device_index;
-					route->next=NULL;
-					route_insert(device,route);
-					break;
-				case 1:
-					point[2]->flag=0;
-					point[2]->device_index=point[1]->device_index;
-					point[2]->hops=point[0]->hops+1;
-					delete[] point[2]->path;
-					point[2]->path=new uint32[point[0]->hops];
-					memcpy(point[2]->path,point[0]->path,(point[0]->hops-1)*sizeof(uint32));
-					point[2]->path[point[0]->hops-1]=point[0]->device_index;
-					break;
-				case 2:
-					break;
-				}
-			}
-			point[1]=point[1]->next;
-		}
-		point[0]=point[0]->next;
-	}
-}
-
-void device_location(device_t *device)
-{
-	if (rand()%2)
-	{
-		device->x+=g_devicestep;
-		device->x=math_min(device->x,g_devicerange-1);
-	}
-	else
-	{
-		device->x-=g_devicestep;
-		device->x=math_max(device->x,(uint32)0);
-	}
-	if (rand()%2)
-	{
-		device->y+=g_devicestep;
-		device->y=math_min(device->y,g_devicerange-1);
-	}
-	else
-	{
-		device->y-=g_devicestep;
-		device->y=math_max(device->y,(uint32)0);
-	}
-}
-
-void device_release(device_t *device)
-{
-	route_t *route,*point;
-
-	route=device->route;
-	while(route)
-	{
-		point=route->next;
-		if (route->path)
-		{
-			delete[] route->path;
-			route->path=NULL;
-		}
-		delete route;
-		route=point;
-	}
-	device->route=NULL;
-}
-
-void print_status(void)
-{
-	uint32 i;
-
-	for (i=0;i<g_devicenum;i++)
-		printf("%ld",g_device[i].status);
-	printf("\r\n");
-}
-
-void print_route(void)
-{
-	uint32 i;
-	route_t *route;
-
-	for (i=0;i<g_devicenum;i++)
-	{
-		printf("dagindex%d-device%ld:",g_device[i].dag_index,g_device[i].device_index);
-		route=g_device[i].route;
-		while(route)
-		{
-			printf("%ld(%ld),",route->device_index,route->hops);
-			/*
-			printf("%ld(%ld=",route->device_index,route->hops);
-			for (j=0;j<route->hops-1;j++)
-				printf("%ld-",route->path[j]);
-			printf("),");
-			*/
-			route=route->next;
-		}
-		printf("\r\n");
-	}
-}
-#endif
 
 //STEP_CONNECT
-void device_recv(device_t *device)
+void connect_recv(device_t *device)
 {
 	//queue->route
 	uint32 i;
@@ -270,7 +84,7 @@ void device_recv(device_t *device)
 	}
 }
 
-void device_seek(device_t *device)
+void connect_seek(device_t *device)
 {
 	//broadcasting to seek/malloc device->route
 	uint32 i;
@@ -309,7 +123,7 @@ void device_seek(device_t *device)
 	}
 }
 
-void device_send(device_t *device)
+void connect_send(device_t *device)
 {
 	//route->queue(device/mainchain)
 	uint8 flag;
@@ -380,25 +194,509 @@ void device_send(device_t *device)
 	delete[] index.key;
 	//update queue
 	queue=new queue_t;
-	queue->step=STEP_TANGLE;
+	queue->step=STEP_TRANSACTION;
 	queue->data=NULL;
 	queue_insert(device,queue);
 }
 
+//STEP_TRANSACTION
+void transaction_recv(device_t *device)
+{
+	//queue->delete queue
+	queue_t *queue,*prev;
+
+	queue=device->queue;
+	while(queue)
+	{
+		if (queue->step==STEP_TRANSACTION)
+		{
+			if (queue==device->queue)
+			{
+				device->queue=queue->next;
+				if (queue->data)
+				{
+					delete[] queue->data;
+					queue->data=NULL;
+				}
+				delete queue;
+				queue=device->queue;
+			}
+			else
+			{
+				prev->next=queue->next;
+				if (queue->data)
+				{
+					delete[] queue->data;
+					queue->data=NULL;
+				}
+				delete queue;
+				queue=prev->next;
+			}
+		}
+		else
+		{
+			prev=queue;
+			queue=queue->next;
+		}
+	}
+}
+
+uint8 transaction_seek(uint32 &trunk,uint32 &branch,device_t *device)
+{
+	//search tip(random algorithm),原则上需要使用手动构造出较宽的tangle(判断tip),这里我使用自动构造tangle(判断solid)
+	uint32 i;
+	uint32 count;
+
+	if (!device->tangle_index)//genesis
+		return 1;
+	if (device->tangle_index==1)//point to genesis
+	{
+		trunk=0;
+		branch=0;
+	}
+	else
+	{
+		//find tip's index
+		count=0;
+		for (i=0;i<device->tangle_index;i++)
+			if (device->tangle[i].flag!=TRANSACTION_SOLID)
+				count++;
+		while(1)
+		{
+			trunk=rand()%count;
+			branch=rand()%count;
+			if (trunk!=branch)
+				break;
+		}
+		//find tip's hash
+		count=0;
+		for (i=0;i<device->tangle_index;i++)
+			if (device->tangle[i].flag!=TRANSACTION_SOLID)
+			{
+				if (trunk==count)
+					trunk=i;
+				if (branch==count)
+					branch=i;
+				count++;
+			}
+	}
+
+	return 0;
+}
+
+//STEP_TANGLE
+void tangle_recv(device_t *device)
+{
+}
+
+//STEP_MOVE
+void move_location(device_t *device)
+{
+	if (rand()%2)
+	{
+		device->x+=g_devicestep;
+		device->x=math_min(device->x,g_devicerange-1);
+	}
+	else
+	{
+		device->x-=g_devicestep;
+		device->x=math_max(device->x,(uint32)0);
+	}
+	if (rand()%2)
+	{
+		device->y+=g_devicestep;
+		device->y=math_min(device->y,g_devicerange-1);
+	}
+	else
+	{
+		device->y-=g_devicestep;
+		device->y=math_max(device->y,(uint32)0);
+	}
+}
+
 void process_device(device_t *device)
 {
+	uint32 trunk,branch;
+	uint32 pow[2];
+	uint8 flag;
+
 	if (!device->queue)
 		return;
 	switch(device->queue->step)
 	{
 	case STEP_CONNECT:
 		//recv
-		device_recv(device);//recv & process device's route->route
-		device_seek(device);//search around nearby->route
+		connect_recv(device);//recv & process device's queue->route
+		connect_seek(device);//search around nearby->route
 		//send
-		device_send(device);//pack & send device's route->queue
+		connect_send(device);//pack & send device's route->queue
+		break;
+	case STEP_TRANSACTION:
+		//recv
+		transaction_recv(device);//recv & process device's queue
+
+		flag=transaction_seek(trunk,branch,device);
+		if (!flag)
+		{
+			flag=transaction_verify(device,&device->tangle[trunk]);
+			if (flag)
+			{
+				LeaveCriticalSection(&g_cs);
+				break;
+			}
+			flag=transaction_verify(device,&device->tangle[branch]);
+			if (flag)
+			{
+				LeaveCriticalSection(&g_cs);
+				break;
+			}
+			pow[0]=transaction_pow(device,&device->tangle[trunk]);
+			pow[1]=transaction_pow(device,&device->tangle[branch]);
+		}
+		else
+			pow[0]=pow[1]=0;
+		flag=transaction_generate(device,pow);
 		break;
 	case STEP_TANGLE:
+
+		break;
+	case STEP_MOVE:
+
 		break;
 	}
 }
+
+#if 0
+
+
+uint8 transaction_verify(device_t *device,transaction_t *transaction)
+{
+	//通过rsa公钥验签验证交易
+	uint32 i;
+	rsa_para para;
+	uint8 result[KEY_LEN];
+
+	para.le=4;
+	para.len=KEY_LEN;
+	for (i=0;i<device->key_index;i++)
+		if (device->key[i].device_index==transaction->device_index)
+			break;
+	para.e=device->key[i].buffer;
+	para.n=&device->key[i].buffer[para.le];
+	i=rsa_enc(result,transaction->cipher,para.len,&para);
+	memset(&result[i],0,para.len-i);
+	if (memcmp(result,transaction->plain,para.len))
+		return 1;
+
+	return 0;
+}
+
+uint32 transaction_pow(device_t *device,transaction_t *transaction)
+{
+	//通过sha256计算hash pow
+	uint64 i;
+	uint32 length;
+	crypt_sha256 *sha256;
+	uint8 content[KEY_LEN+1],result[HASH_LEN];
+
+	length=KEY_LEN;
+	memcpy(content,transaction->plain,length);
+	sha256=new crypt_sha256;
+	for (i=1;i<0x100000000;i++)
+	{
+		length=_add(content,content,1,length);
+		sha256->sha256_init();
+		sha256->sha256_update(content,length);
+		sha256->sha256_final(result);
+		if (_bitlen(result,HASH_LEN)<=HASH_LEN*8-COMPARE_LEN)
+			break;
+	}
+	if (i==0x100000000)
+		i=0;
+	delete sha256;
+
+	return (uint32)i;
+}
+
+void transaction_signature(transaction_t *transaction,device_t *device)
+{
+	//通过rsa私钥签名加密交易
+	uint32 i;
+	rsa_para para;
+
+	para.le=4;
+	para.len=KEY_LEN;
+	para.lr=MASK_LEN;
+	para.d=&device->pair[para.le+para.len];
+	para.p=&device->pair[para.le+para.len*2];
+	para.q=&device->pair[para.le+para.len*2+para.len/2];
+	para.dp=&device->pair[para.le+para.len*2+para.len/2*2];
+	para.dq=&device->pair[para.le+para.len*2+para.len/2*3];
+	para.qp=&device->pair[para.le+para.len*2+para.len/2*4];
+	i=rsa_dec(transaction->cipher,transaction->plain,para.len,&para,RSA_CRT);
+	memset(&transaction->cipher[i],0,para.len-i);
+}
+
+uint8 transaction_generate(device_t *device,uint32 *pow)
+{
+	uint32 i;
+	route_t *route;
+	transaction_t transaction;
+
+	if (device->transaction_index==TRANSACTION_LENGTH)//transaction full
+		return RET_TRANSACTION_FULL;
+	if (device->queue_index==QUEUE_LENGTH)//queue full
+		return RET_QUEUE_FULL;
+	//generate transaction
+	transaction.device_index=device->device_index;
+	g_index++;
+	transaction.index.code=g_index;
+	transaction.weight_self=0;
+	transaction.weight_accu=0;
+	transaction.height=0;
+	transaction.depth=0;
+	transaction.integral=0;
+	transaction.type=TRANSACTION_VALUE;//rand()%2;
+	transaction.flag=TRANSACTION_NONE;
+	memset(&transaction.trunk,0,sizeof(hash_t));
+	memset(&transaction.branch,0,sizeof(hash_t));
+	_rand(transaction.plain,KEY_LEN);
+	i=_mod(transaction.plain,transaction.plain,&device->pair[4],KEY_LEN,KEY_LEN);
+	memset(&transaction.plain[i],0,KEY_LEN-i);
+	if (transaction.type==TRANSACTION_TYPE_VALUE)
+		transaction_signature(&transaction,device);
+	memcpy(transaction.pow,pow,2*sizeof(uint32));
+	device->queue[device->queue_index].device_index=device->device_index;
+	device->queue[device->queue_index].info=INFO_TRANSACTION;
+	memcpy((void *)device->queue[device->queue_index].buffer,&transaction,sizeof(transaction_t));
+	//send transaction
+	route=device->route;
+	while(route)
+	{
+		if (g_device[route->device_index].queue_index==QUEUE_LENGTH)
+		{
+			route=route->next;
+			continue;
+		}
+		g_device[route->device_index].queue[g_device[route->device_index].queue_index].device_index=device->device_index;
+		g_device[route->device_index].queue[g_device[route->device_index].queue_index].info=INFO_TRANSACTION;
+		memcpy((void *)g_device[route->device_index].queue[g_device[route->device_index].queue_index].buffer,(void *)device->queue[device->queue_index].buffer,sizeof(transaction_t));
+		g_device[route->device_index].queue_index++;
+		route=route->next;
+	}
+	device->queue_index++;
+
+	return 0;
+}
+
+uint8 transaction_recv(device_t *device)
+{
+	uint32 i;
+
+	if (!device->queue_index)//queue empty
+		return RET_QUEUE_EMPTY;
+	for (i=0;i<device->queue_index;i++)
+		if (device->queue[i].info==INFO_TRANSACTION)
+			break;
+	if (i==device->queue_index)//no transaction in queue
+		return RET_TRANSACTION_NONE;
+	if (device->transaction_index==TRANSACTION_LENGTH)//transaction full
+		return RET_TRANSACTION_FULL;
+	//update transaction
+	memcpy(&device->transaction[device->transaction_index],(void *)device->queue[i].buffer,sizeof(transaction_t));
+	device->transaction_index++;
+	//reset queue
+	device->queue_index--;
+	for (;i<device->queue_index;i++)
+		memcpy(&device->queue[i],&device->queue[i+1],sizeof(queue_t));
+	memset(&device->queue[device->queue_index],0,sizeof(queue_t));
+
+	return 0;
+}
+
+uint8 tangle_join(device_t *device,uint32 trunk,uint32 branch)
+{
+	//将transaction队列的一项加入tangle队列
+	uint32 i;
+	route_t *route;
+	
+	if (!device->transaction_index)//transaction empty
+		return RET_TRANSACTION_EMPTY;
+	if (device->tangle_index==TANGLE_LENGTH)//tangle full
+		return RET_TANGLE_FULL;
+	//join tangle
+	memcpy(&device->tangle[device->tangle_index],&device->transaction[0],sizeof(transaction_t));
+	device->tangle[device->tangle_index].flag=TRANSACTION_TIP;
+	if (device->tangle_index)
+	{
+		memcpy(&device->tangle[device->tangle_index].trunk,&device->tangle[trunk].index,sizeof(hash_t));
+		memcpy(&device->tangle[device->tangle_index].branch,&device->tangle[branch].index,sizeof(hash_t));
+		device->tangle[trunk].flag=TRANSACTION_TANGLE;
+		device->tangle[branch].flag=TRANSACTION_TANGLE;
+	}
+	//reset transaction
+	device->transaction_index--;
+	for (i=0;i<device->transaction_index;i++)
+		memcpy(&device->transaction[i],&device->transaction[i+1],sizeof(transaction_t));
+	memset(&device->transaction[device->transaction_index],0,sizeof(transaction_t));
+	//send tangle
+	route=device->route;
+	while(route)
+	{
+		if (g_device[route->device_index].queue_index==QUEUE_LENGTH)
+		{
+			route=route->next;
+			continue;
+		}
+		g_device[route->device_index].queue[g_device[route->device_index].queue_index].device_index=device->device_index;
+		g_device[route->device_index].queue[g_device[route->device_index].queue_index].info=INFO_TANGLE;
+		memcpy((void *)g_device[route->device_index].queue[g_device[route->device_index].queue_index].buffer,&device->tangle[device->tangle_index],sizeof(transaction_t));
+		g_device[route->device_index].queue_index++;
+		route=route->next;
+	}
+	device->tangle_index++;
+
+	return 0;
+}
+
+uint8 tangle_check(void)
+{
+	//检查各设备的tangle是否一致
+	uint32 i,j,k,r;
+
+	for (i=0;i<g_devicenum;i++)
+		if (g_device[i].dag_index)
+		{
+			for (j=i+1;j<g_devicenum;j++)
+				if (g_device[i].dag_index==g_device[j].dag_index)
+				{
+					r=math_min(g_device[i].tangle_index,g_device[j].tangle_index);
+					for (k=0;k<r;k++)
+						if (g_device[i].tangle[k].device_index!=g_device[j].tangle[k].device_index || memcmp(&g_device[i].tangle[k].index,&g_device[j].tangle[k].index,sizeof(hash_t)) || memcmp(&g_device[i].tangle[k].trunk,&g_device[j].tangle[k].trunk,sizeof(hash_t)) || memcmp(&g_device[i].tangle[k].branch,&g_device[j].tangle[k].branch,sizeof(hash_t)))
+							return 1;
+				}
+		}
+
+	return 0;
+}
+
+uint8 tangle_check(device_t *device,transaction_t *transaction)
+{
+	//检查tangle中是否有存在参照的transaction
+	uint32 i;
+
+	if (!device->tangle_index)//tangle empty
+		return 0;
+	for (i=0;i<device->tangle_index;i++)
+		if (!memcmp((void *)&device->tangle[i].index,&transaction->index,sizeof(hash_t)))
+			break;
+	if (i==device->tangle_index)//no same transaction in tangle
+		return 1;
+
+	return 0;
+}
+
+uint8 tangle_recv(device_t *device)
+{
+	uint32 i;
+	uint8 flag;
+
+	if (!device->queue_index)//queue empty
+		return RET_QUEUE_EMPTY;
+	if (device->tangle_index==TANGLE_LENGTH)//tangle full
+		return RET_TANGLE_FULL;
+	for (i=0;i<device->queue_index;i++)
+		if (device->queue[i].info==INFO_TANGLE)
+			break;
+	if (i==device->queue_index)//no tangle in queue
+		return RET_TANGLE_NONE;
+	//check tangle's existance
+	flag=tangle_check(device,(transaction_t *)device->queue[i].buffer);
+	if (flag)//no transaction in tangle
+	{
+		//update tangle
+		memcpy(&device->tangle[device->tangle_index],(void *)device->queue[i].buffer,sizeof(transaction_t));
+		device->tangle_index++;
+	}
+	//reset queue
+	device->queue_index--;
+	for (;i<device->queue_index;i++)
+		memcpy(&device->queue[i],&device->queue[i+1],sizeof(queue_t));
+	memset(&device->queue[device->queue_index],0,sizeof(queue_t));
+
+	return 0;
+}
+
+
+//1.generate transaction by random(一种是输入签名,一种是传输信息). broadcast
+//2.tangle join(search tip). broadcast
+//3.transaction validation:if most of tip reference to old transactions, then solid.validation->broadcast->waiting for device's response,synch device's queue*
+//4.ledger validation:check each solid transactions, then milestone. broadcast
+while(1)
+	{
+		switch(task)
+		{
+		case 0://search tip/verify/generate transaction and broadcast
+			EnterCriticalSection(&g_cs);
+			flag=transaction_search(trunk,branch,device);
+			if (!flag)
+			{
+				flag=transaction_verify(device,&device->tangle[trunk]);
+				if (flag)
+				{
+					LeaveCriticalSection(&g_cs);
+					break;
+				}
+				flag=transaction_verify(device,&device->tangle[branch]);
+				if (flag)
+				{
+					LeaveCriticalSection(&g_cs);
+					break;
+				}
+				pow[0]=transaction_pow(device,&device->tangle[trunk]);
+				pow[1]=transaction_pow(device,&device->tangle[branch]);
+			}
+			else
+				pow[0]=pow[1]=0;
+			flag=transaction_generate(device,pow);
+			//if (flag)
+			//	print_return(device,task,flag);
+			LeaveCriticalSection(&g_cs);
+			break;
+		case 1://recv transaction
+			EnterCriticalSection(&g_cs);
+			flag=transaction_recv(device);
+			//if (flag)
+			//	print_return(device,task,flag);
+			LeaveCriticalSection(&g_cs);
+			break;
+		case 2://join tangle and broadcast
+			EnterCriticalSection(&g_cs);
+			flag=tangle_join(device,trunk,branch);
+			//if (flag)
+			//	print_return(device,task,flag);
+			LeaveCriticalSection(&g_cs);
+			break;
+		case 3://recv tangle
+			EnterCriticalSection(&g_cs);
+			flag=tangle_recv(device);
+			//if (flag)
+			//	print_return(device,task,flag);
+			LeaveCriticalSection(&g_cs);
+			break;
+		case 4:
+			EnterCriticalSection(&g_cs);
+			tangle_check();
+			LeaveCriticalSection(&g_cs);
+			break;
+		}
+		//EnterCriticalSection(&g_cs);
+		//printf("thread_device%ld task=%d\r\n",device->device_index,task);
+		//LeaveCriticalSection(&g_cs);
+		task++;
+		if (task==5)
+			task=0;
+		//Sleep(10);
+		//while(1);
+	}
+#endif
