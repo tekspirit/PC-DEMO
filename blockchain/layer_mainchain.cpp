@@ -150,6 +150,11 @@ void transaction_recv(mainchain_t *mainchain)
 {
 }
 
+//STEP_TANGLE
+void tangle_recv(mainchain_t *mainchain)
+{
+}
+
 void process_mainchain(mainchain_t *mainchain)
 {
 	if (!mainchain->queue)
@@ -163,6 +168,10 @@ void process_mainchain(mainchain_t *mainchain)
 	case STEP_TRANSACTION:
 		//recv
 		transaction_recv(mainchain);//recv queue & process mainchain's
+		break;
+	case STEP_TANGLE:
+		//recv
+		tangle_recv(mainchain);//recv queue & process mainchain's
 		break;
 	}
 }
