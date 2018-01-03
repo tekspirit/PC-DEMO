@@ -17,8 +17,8 @@
 #define KEY_E 4 //公钥e字节数
 #define KEY_MASK 0 //指数盲化字节数
 
-#define TRANSACTION_NORMAL 0 //普通交易
-#define TRANSACTION_VALUE 1 //有价交易(需账本验证)
+//#define TRANSACTION_NORMAL 0 //普通交易
+//#define TRANSACTION_VALUE 1 //有价交易(需账本验证)
 /*
 #define TAG_NONE 0 //未交易认证transaction
 #define TRANSACTION_TIP 1 //已链入tangle成为tip
@@ -38,16 +38,20 @@ struct index_t
 	uint32 *token;//账户数额
 	uint8 *node;//0-重节点,1-轻节点
 };
+struct deal_t
+{
+	uint32 device_index[2];//设备索引(类似于唯一物理地址).0-源设备,1-目标设备
+	uint32 token;//交易数额
+};
 struct transaction_t
 {
 	uint32 index;//交易索引
-	uint32 device_index[2];//设备索引(类似于唯一物理地址).0-源设备,1-目标设备
-	uint32 token;//交易数额
-	uint8 type;//交易类型.0-普通信息,1-有价信息
+	deal_t deal;//交易原子
+	//uint8 type;//交易类型.0-普通信息,1-有价信息
 	uint8 plain[KEY_LEN];//明文验证
 	uint8 cipher[KEY_LEN];//密文验证
 	uint32 pow[2];//按计算规则得到的前序trunk/branch的pow值
-	volatile uint8 flag;//交易状态.0-none,1-solid,2-tangle,3-milestone
+	uint8 flag;//交易状态.0-none,1-solid,2-tangle,3-milestone
 	uint32 trunk;//主交易节点->交易索引
 	uint32 branch;//从交易节点->交易索引
 	/*
@@ -100,17 +104,19 @@ struct mainchain_t
 	uint32 dag_number;//区域数目
 	uint32 list_number;//节点数目
 	list_t *list;//节点属性列表
+	transaction_t *dag;//账本链表(全局账本)
 };
 struct device_t
 {
 	uint32 x;
 	uint32 y;
-	uint8 node;//0-重节点(区域账本),1-轻节点(无账本)
+	uint8 node;//0-重节点,1-轻节点
 	uint32 device_index;//设备索引(类似于唯一物理地址)
 	route_t *route;//连接设备路由链表
 	queue_t *queue;//消息队列
 	rsa_t rsa;//当前设备的公私钥对
 	uint32 token;//账户数额
+	transaction_t *dag;//账本链表(重节点-区域账本,轻节点-无账本)
 /*
 	//index_t *index;//设备索引链表
 	//dag

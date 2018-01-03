@@ -4,6 +4,9 @@
 uint32 g_devicenum[2];//设备个数.0-重节点,1-轻节点
 uint32 g_devicerange;//设备坐标范围
 uint32 g_devicestep;//设备步进值
+uint32 g_dealnumber;//交易原子列表个数
+uint32 g_dealindex;//交易原子列表索引
+deal_t *g_deal;//交易原子列表
 CRITICAL_SECTION g_cs;
 device_t *g_device;//设备数组
 mainchain_t g_mainchain;//主链
@@ -49,12 +52,12 @@ uint32 WINAPI thread_device(PVOID pParam)
 
 void main(int argc,char* argv[])
 {
-	uint32 account_num;//账户个数
+	uint32 account;//账户个数
 	uint32 token;//初始化资金
 	//
 	uint32 i;
 	uint8 flag;
-	int8 buf[1000];
+	int8 buf[1000],*point[2];
 	FILE *file;
 	HANDLE thread_handle;
 	uint32 thread_id;
@@ -78,15 +81,53 @@ void main(int argc,char* argv[])
 	fgets(buf,1000,file);//[blockchain]
 	fgets(buf,1000,file);
 	buf[strlen(buf)-1]=0;
-	account_num=atol(&buf[12]);//account_num
+	account=atol(&buf[8]);//account
 	fgets(buf,1000,file);
 	buf[strlen(buf)-1]=0;
 	token=atol(&buf[6]);//token
+	fgets(buf,1000,file);//[transaction]
+	i=ftell(file);
+	g_dealnumber=0;
+	while(1)
+	{
+		if (feof(file))
+			break;
+		memset(buf,0,1000*sizeof(int8));
+		fgets(buf,1000,file);
+		if (!strcmp(buf,""))
+			break;
+		g_dealnumber++;
+	}
+	g_deal=new deal_t[g_dealnumber];
+	fseek(file,i,SEEK_SET);
+	g_dealnumber=0;
+	while(1)
+	{
+		if (feof(file))
+			break;
+		memset(buf,0,1000*sizeof(int8));
+		fgets(buf,1000,file);
+		if (!strcmp(buf,""))
+			break;
+		buf[strlen(buf)-1]=0;
+		point[0]=buf;
+		point[1]=strchr(point[0],',');
+		*point[1]='\0';
+		g_deal[g_dealnumber].device_index[0]=atol(point[0]);
+		point[0]=point[1]+1;
+		point[1]=strchr(point[0],',');
+		*point[1]='\0';
+		g_deal[g_dealnumber].device_index[1]=atol(point[0]);
+		point[0]=point[1]+1;
+		g_deal[g_dealnumber].token=atol(point[0]);
+		g_dealnumber++;
+	}
 	fclose(file);
 	//0.initial device/timer/thread_device/thread_mainchain/cs
 	InitializeCriticalSection(&g_cs);
 	srand((unsigned)time(NULL));
 	g_index=0;
+	g_dealindex=0;
 	g_device=new device_t[g_devicenum[0]+g_devicenum[1]];
 	for (i=0;i<g_devicenum[0]+g_devicenum[1];i++)
 	{
@@ -103,6 +144,7 @@ void main(int argc,char* argv[])
 		queue_insert(&g_device[i],queue);
 		key_generate(&g_device[i]);
 		g_device[i].token=token;
+		g_device[i].dag=NULL;
 
 
 		//g_device[i].line=DEVICE_LINE_ON;
@@ -138,6 +180,7 @@ void main(int argc,char* argv[])
 	g_mainchain.dag_number=0;
 	g_mainchain.list_number=0;
 	g_mainchain.list=NULL;
+	g_mainchain.dag=NULL;
 	thread_handle=CreateThread(NULL,0,thread_mainchain,(PVOID)&g_mainchain,0,&thread_id);
 	if (!thread_handle)
 	{
@@ -169,11 +212,9 @@ void main(int argc,char* argv[])
 #endif
 	}
 	//release
-	/*
-	for (i=0;i<g_devicenum;i++)
-		device_release(&g_device[i]);
-	delete[] (uint8 *)g_init;
-	delete[] (uint8 *)g_flag;
-	delete[] g_device;*/
+	//for (i=0;i<g_devicenum[0]+g_devicenum[1];i++)
+	//	device_release(&g_device[i]);
+	//delete[] g_device;
+	delete[] g_deal;
 	DeleteCriticalSection(&g_cs);
 }

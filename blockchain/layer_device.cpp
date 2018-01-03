@@ -3,9 +3,13 @@
 extern uint32 g_devicenum[2];//设备个数
 extern uint32 g_devicerange;//设备坐标范围
 extern uint32 g_devicestep;//设备步进值
+extern uint32 g_dealnumber;//交易原子列表个数
+extern uint32 g_dealindex;//交易原子列表索引
+extern deal_t *g_deal;//交易原子列表
 extern CRITICAL_SECTION g_cs;
 extern device_t *g_device;//设备数组
 extern mainchain_t g_mainchain;//主链
+extern volatile uint32 g_index;//临时用来统计交易号码的(以后会用hash_t代替,计数从1开始)
 
 //STEP_CONNECT
 void connect_recv(device_t *device)
@@ -218,6 +222,7 @@ void transaction_recv(device_t *device)
 	{
 		if (queue->step==STEP_TRANSACTION)
 		{
+			//dingying重节点交易处理
 			if (queue==device->queue)
 			{
 				device->queue=queue->next;
@@ -247,6 +252,61 @@ void transaction_recv(device_t *device)
 			queue=queue->next;
 		}
 	}
+}
+
+void transaction_signature(transaction_t *transaction,device_t *device)
+{
+	//encrypt transaction with rsa private key
+	uint32 i;
+
+	i=rsa_dec(transaction->cipher,transaction->plain,device->rsa.len,&device->rsa,RSA_CRT);
+	memset(&transaction->cipher[i],0,device->rsa.len-i);
+}
+
+transaction_t *transaction_generate(device_t *device)
+{
+	//generate transaction
+	uint32 i;
+	transaction_t *transaction;
+
+	if (device->device_index!=g_deal[g_dealindex].device_index)//非下一笔交易索引
+		return NULL;
+	if (g_deal[g_dealindex].token>device->token)//账本验证
+		return NULL;
+	transaction=new transaction_t;
+	transaction->index=++g_index;
+	memcpy(&transaction->deal,&g_deal[g_dealindex],sizeof(transaction_t));
+	_rand(transaction->plain,KEY_LEN);
+	i=_mod(transaction->plain,transaction->plain,&device->rsa.n,KEY_LEN,KEY_LEN);
+	memset(&transaction->plain[i],0,KEY_LEN-i);
+	transaction_signature(transaction,device);
+	g_dealindex++;
+
+	return transaction;
+}
+
+void transaction_send(device_t *device,transaction_t *transaction)
+{
+	queue_t *queue;
+
+	if (!transaction)
+	{
+		//update queue
+		queue=new queue_t;
+		queue->step=STEP_TRANSACTION;
+		queue->data=NULL;
+		queue_insert(device,queue);
+		return;
+	}
+	if (device->node==NODE_LIGHT)//若是轻节点,则将交易传给第一重节点
+	{
+		//update queue
+		queue=new queue_t;
+		queue->step=STEP_TRANSACTION;
+		queue->data=NULL;//dingying
+		queue_insert(device,queue);
+	}
+	else//若是重节点,则
 }
 
 uint8 transaction_seek(uint32 &trunk,uint32 &branch,device_t *device)
@@ -328,6 +388,7 @@ void process_device(device_t *device)
 	uint32 trunk,branch;
 	uint32 pow[2];
 	uint8 flag;
+	transaction_t *transaction;
 
 	if (!device->queue)
 		return;
@@ -336,6 +397,7 @@ void process_device(device_t *device)
 	case STEP_CONNECT:
 		//recv
 		connect_recv(device);//recv & process device's queue->route
+		//process
 		connect_seek(device);//search around nearby->route
 		//send
 		connect_send(device);//pack & send device's route->queue
@@ -343,6 +405,12 @@ void process_device(device_t *device)
 	case STEP_TRANSACTION:
 		//recv
 		transaction_recv(device);//recv & process device's queue
+		//process
+		transaction=transaction_generate(device);
+		//send
+		transaction_send(device,transaction);//pack & send device's route->queue
+
+
 #if 0
 		flag=transaction_seek(trunk,branch,device);
 		if (!flag)
@@ -440,24 +508,7 @@ uint32 transaction_pow(device_t *device,transaction_t *transaction)
 	return (uint32)i;
 }
 
-void transaction_signature(transaction_t *transaction,device_t *device)
-{
-	//通过rsa私钥签名加密交易
-	uint32 i;
-	rsa_para para;
 
-	para.le=4;
-	para.len=KEY_LEN;
-	para.lr=MASK_LEN;
-	para.d=&device->pair[para.le+para.len];
-	para.p=&device->pair[para.le+para.len*2];
-	para.q=&device->pair[para.le+para.len*2+para.len/2];
-	para.dp=&device->pair[para.le+para.len*2+para.len/2*2];
-	para.dq=&device->pair[para.le+para.len*2+para.len/2*3];
-	para.qp=&device->pair[para.le+para.len*2+para.len/2*4];
-	i=rsa_dec(transaction->cipher,transaction->plain,para.len,&para,RSA_CRT);
-	memset(&transaction->cipher[i],0,para.len-i);
-}
 
 uint8 transaction_generate(device_t *device,uint32 *pow)
 {
