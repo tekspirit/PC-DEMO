@@ -50,7 +50,7 @@ uint32 WINAPI thread_device(PVOID pParam)
 void main(int argc,char* argv[])
 {
 	uint32 account_num;//账户个数
-	uint32 money;//初始化资金
+	uint32 token;//初始化资金
 	//
 	uint32 i;
 	uint8 flag;
@@ -81,7 +81,7 @@ void main(int argc,char* argv[])
 	account_num=atol(&buf[12]);//account_num
 	fgets(buf,1000,file);
 	buf[strlen(buf)-1]=0;
-	money=atol(&buf[6]);//money
+	token=atol(&buf[6]);//token
 	fclose(file);
 	//0.initial device/timer/thread_device/thread_mainchain/cs
 	InitializeCriticalSection(&g_cs);
@@ -90,7 +90,6 @@ void main(int argc,char* argv[])
 	g_device=new device_t[g_devicenum[0]+g_devicenum[1]];
 	for (i=0;i<g_devicenum[0]+g_devicenum[1];i++)
 	{
-		EnterCriticalSection(&g_cs);
 		g_device[i].x=rand()%g_devicerange;
 		g_device[i].y=rand()%g_devicerange;
 		g_device[i].node=i<g_devicenum[0] ? NODE_HEAVY : NODE_LIGHT;//rand()%2 ? NODE_LIGHT : NODE_HEAVY;
@@ -103,7 +102,7 @@ void main(int argc,char* argv[])
 		*(uint32 *)queue->data=0;//align problem?
 		queue_insert(&g_device[i],queue);
 		key_generate(&g_device[i]);
-		LeaveCriticalSection(&g_cs);
+		g_device[i].token=token;
 
 
 		//g_device[i].line=DEVICE_LINE_ON;
@@ -118,7 +117,10 @@ void main(int argc,char* argv[])
 		g_device[i].transaction_index=0;
 		g_device[i].key_index=0;
 		g_device[i].account_id=rand()%account_num;
-		g_device[i].account_money=money;*/
+		g_device[i].account_money=token;*/
+	}
+	for (i=0;i<g_devicenum[0]+g_devicenum[1];i++)
+	{
 		//lpThreadAttributes:指向security attributes
 		//dwStackSize:栈大小
 		//lpStartAddress:线程函数。定义形式必须uint32 WINAPI xxx(PVOID pParam)

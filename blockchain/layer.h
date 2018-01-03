@@ -35,7 +35,34 @@ struct index_t
 	uint32 number;//待处理索引数目
 	uint32 *index;//待处理索引列表
 	uint8 *key;//待处理索引公钥
+	uint32 *token;//账户数额
 	uint8 *node;//0-重节点,1-轻节点
+};
+struct transaction_t
+{
+	uint32 index;//交易索引
+	uint32 device_index[2];//设备索引(类似于唯一物理地址).0-源设备,1-目标设备
+	uint32 token;//交易数额
+	uint8 type;//交易类型.0-普通信息,1-有价信息
+	uint8 plain[KEY_LEN];//明文验证
+	uint8 cipher[KEY_LEN];//密文验证
+	uint32 pow[2];//按计算规则得到的前序trunk/branch的pow值
+	volatile uint8 flag;//交易状态.0-none,1-solid,2-tangle,3-milestone
+	uint32 trunk;//主交易节点->交易索引
+	uint32 branch;//从交易节点->交易索引
+	/*
+	uint32 weight_self;//自身权重
+	uint32 weight_accu;//累积权重
+	uint32 height;//高度(至创世块)
+	uint32 depth;//深度(至最远tip)
+	uint32 integral;//交易积分
+	uint32 nonce;//临时随机数(证明是从当前device发出,防止女巫攻击和批量交易攻击)
+	*/
+	//hash_t address;//地址
+	//hash_t trunk;//主交易
+	//hash_t branch;//从交易
+	//hash_t bundle;//包
+	//hash_t tag;//标签
 };
 struct key_t
 {
@@ -47,6 +74,7 @@ struct list_t
 	uint32 dag_index;//区域索引
 	uint32 device_index;//设备索引
 	key_t key;//公钥
+	uint32 token;//账户数额
 	uint8 node;//0-重节点,1-轻节点
 };
 struct route_t
@@ -56,6 +84,7 @@ struct route_t
 	//uint32 hops;//跳跃间隔
 	//uint32 *path;//路由路径
 	key_t key;//公钥
+	uint32 token;//账户数额
 	uint8 node;//0-重节点,1-轻节点
 	route_t *next;
 };
@@ -81,6 +110,7 @@ struct device_t
 	route_t *route;//连接设备路由链表
 	queue_t *queue;//消息队列
 	rsa_t rsa;//当前设备的公私钥对
+	uint32 token;//账户数额
 /*
 	//index_t *index;//设备索引链表
 	//dag
@@ -97,7 +127,7 @@ struct device_t
 	volatile uint32 transaction_index;//transaction索引长度
 	//application
 	uint32 account_id;//账户id
-	uint32 account_money;//账户现金
+	uint32 account_money;//账户数额
 	*/
 };
 //function

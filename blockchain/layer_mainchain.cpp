@@ -29,7 +29,8 @@ void connect_recv(mainchain_t *mainchain)
 		index.number=*(uint32 *)queue->data;
 		index.index=(uint32 *)(queue->data+1*sizeof(uint32));
 		index.key=queue->data+(1+index.number)*sizeof(uint32);
-		index.node=queue->data+(1+index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN);
+		index.token=(uint32 *)(queue->data+(1+index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN));
+		index.node=queue->data+(1+2*index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN);
 		//compute list_number
 		dag_index=mainchain->dag_number;
 		for (j=0;j<index.number;j++)
@@ -60,6 +61,7 @@ void connect_recv(mainchain_t *mainchain)
 			list[i].device_index=index.index[i];
 			memcpy(list[i].key.e,&index.key[i*(KEY_E+KEY_LEN)],KEY_E);
 			memcpy(list[i].key.n,&index.key[i*(KEY_E+KEY_LEN)+KEY_E],KEY_LEN);
+			list[i].token=index.token[i];
 			list[i].node=index.node[i];
 		}
 		k=index.number;
@@ -74,6 +76,7 @@ void connect_recv(mainchain_t *mainchain)
 				list[k].device_index=mainchain->list[j].device_index;
 				memcpy(list[k].key.e,&mainchain->list[j].key.e,KEY_E);
 				memcpy(list[k].key.n,&mainchain->list[j].key.n,KEY_LEN);
+				list[k].token=mainchain->list[j].token;
 				list[k].node=mainchain->list[j].node;
 				k++;
 			}
