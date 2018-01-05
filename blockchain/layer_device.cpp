@@ -287,26 +287,45 @@ transaction_t *transaction_generate(device_t *device)
 
 void transaction_send(device_t *device,transaction_t *transaction)
 {
+	route_t *route;
 	queue_t *queue;
 
-	if (!transaction)
+	//update queue(self)
+	if (!transaction || device->node==NODE_LIGHT)
 	{
-		//update queue
 		queue=new queue_t;
 		queue->step=STEP_TRANSACTION;
 		queue->data=NULL;
 		queue_insert(device,queue);
 		return;
 	}
+	if (device->node==NODE_LIGHT)
+	{
+		route=device->route;
+		while(route)
+		{
+			if (route->node==NODE_HEAVY)
+				break;
+			route=route->next;
+		}
+	}
+	//update queue(other)
+	queue=new queue_t;
+	queue->step=STEP_TRANSACTION;
+	queue->data=new uint8[sizeof(spv_t)];
+	*(uint32 *)queue->data=transaction->index;
+	memcpy(queue->data+1*sizeof(uint32),&transaction->deal,sizeof(deal_t));
+	memcpy(queue->data+1*sizeof(uint32)+sizeof(deal_t),transaction->plain,KEY_LEN);
+	memcpy(queue->data+1*sizeof(uint32)+sizeof(deal_t)+KEY_LEN,transaction->cipher,KEY_LEN);
+	*(uint32 *)(queue->data+1*sizeof(uint32)+sizeof(deal_t)+2*KEY_LEN)=transaction->trunk;
+	*(uint32 *)(queue->data+2*sizeof(uint32)+sizeof(deal_t)+2*KEY_LEN)=transaction->branch;
 	if (device->node==NODE_LIGHT)//若是轻节点,则将交易传给第一重节点
 	{
-		//update queue
-		queue=new queue_t;
-		queue->step=STEP_TRANSACTION;
-		queue->data=NULL;//dingying
-		queue_insert(device,queue);
+		if (route)
+			queue_insert(&g_device[route->device_index],queue);
 	}
-	else//若是重节点,则
+	else//若是重节点,则更新给自己
+		queue_insert(device,queue);
 }
 
 uint8 transaction_seek(uint32 &trunk,uint32 &branch,device_t *device)

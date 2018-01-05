@@ -59,7 +59,8 @@ void queue_delete(device_t *device)
 void queue_delete(queue_t *prev,queue_t *queue)
 {
 	//delete queue
-	prev->next=queue->next;
+	if (prev)
+		prev->next=queue->next;
 	if (queue->data)
 	{
 		delete[] queue->data;

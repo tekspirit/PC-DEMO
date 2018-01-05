@@ -27,7 +27,10 @@
 #define TRANSACTION_MILESTONE 4 //已账本验证milestone
 //#define QUEUE_LENGTH 0x20
 */
-#define TIMER_CONNECT 1 //组网更新时间(重节点向服务器)
+//#define TIMER_CONNECT 1 //组网更新时间(重节点向服务器)
+
+
+
 //typedef
 //struct
 struct index_t
@@ -42,6 +45,15 @@ struct deal_t
 {
 	uint32 device_index[2];//设备索引(类似于唯一物理地址).0-源设备,1-目标设备
 	uint32 token;//交易数额
+};
+struct spv_t
+{
+	uint32 index;//交易索引
+	deal_t deal;//交易原子
+	uint8 plain[KEY_LEN];//明文验证
+	uint8 cipher[KEY_LEN];//密文验证
+	uint32 trunk;//主交易节点->交易索引
+	uint32 branch;//从交易节点->交易索引
 };
 struct transaction_t
 {
