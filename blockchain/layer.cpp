@@ -107,3 +107,65 @@ void key_generate(device_t *device)
 			break;
 	}
 }
+
+//compute tip:计算dag中的tip数
+uint32 compute_tip(transaction_t *dag)
+{
+	uint32 number;
+	transaction_t *transaction;
+
+	number=0;
+	transaction=dag;
+	while(transaction)
+	{
+		number++;
+		transaction=transaction->next;
+	}
+
+	return number;
+}
+
+//compute nontip:计算dag中的nontip数
+uint32 compute_nontip(transaction_t *transaction)
+{
+	if (transaction->flag)
+		return 0;
+	transaction->flag=1;
+	if (transaction->trunk && transaction->branch)
+		return compute_nontip(transaction->trunk)+compute_nontip(transaction->branch);
+	if (transaction->trunk)
+		return compute_nontip(transaction->trunk)+1;
+	if (transaction->branch)
+		return compute_nontip(transaction->branch)+1;
+
+	return 1;
+}
+
+//compute transaction:计算dag中所有交易数(tip+nontip)
+uint32 compute_transaction(transaction_t *dag)
+{
+	uint32 number;
+	transaction_t *transaction;
+
+	number=0;
+	transaction=dag;
+	while(transaction)
+	{
+		number+=compute_nontip(transaction)+1;
+		transaction=transaction->next;
+	}
+
+	return number;
+}
+
+//compute height:创世交易至当前交易所有路径中的最长路径(NP-Hard问题)
+uint32 compute_height(transaction_t *dag,transaction_t *transaction)
+{
+
+}
+
+//compute depth:当前交易至某个tip的最长路径
+uint32 compute_depth(transaction_t *dag,transaction_t *transaction)
+{
+
+}

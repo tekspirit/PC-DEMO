@@ -26,6 +26,7 @@ void connect_recv(device_t *device)
 	{
 		if (queue->step==STEP_CONNECT)
 		{
+			//queue process
 			index.number=*(uint32 *)queue->data;
 			index.index=(uint32 *)(queue->data+1*sizeof(uint32));
 			index.key=queue->data+(1+index.number)*sizeof(uint32);
@@ -59,6 +60,7 @@ void connect_recv(device_t *device)
 					route_insert(device,route);
 				}
 			}
+			//queue delete
 			if (queue==device->queue)
 			{
 				device->queue=queue->next;
@@ -212,9 +214,83 @@ void connect_send(device_t *device)
 }
 
 //STEP_TRANSACTION
+//0-dag为空,1-dag非空
+uint8 transaction_seek(uint32 &trunk,uint32 &branch,device_t *device)
+{
+	//search tip(random algorithm),原则上需要使用手动构造出较宽的tangle(判断tip),这里我使用自动构造tangle(判断solid)
+	uint32 i;
+	uint32 count;
+
+	if (!device->dag)//genesis
+		return 1;
+	if (device->dag==1)//point to genesis
+	{
+		trunk=0;
+		branch=0;
+	}
+	else
+	{
+		//find tip's index
+		count=0;
+		for (i=0;i<device->tangle_index;i++)
+			if (device->tangle[i].flag!=TRANSACTION_SOLID)
+				count++;
+		while(1)
+		{
+			trunk=rand()%count;
+			branch=rand()%count;
+			if (trunk!=branch)
+				break;
+		}
+		//find tip's hash
+		count=0;
+		for (i=0;i<device->tangle_index;i++)
+			if (device->tangle[i].flag!=TRANSACTION_SOLID)
+			{
+				if (trunk==count)
+					trunk=i;
+				if (branch==count)
+					branch=i;
+				count++;
+			}
+	}
+
+	return 0;
+}
+
+uint8 transaction_verify(device_t *device,transaction_t *transaction)
+{
+	//通过rsa公钥验签验证交易
+	uint32 i;
+	rsa_t rsa;
+	route_t *route;
+	uint8 result[KEY_LEN];
+
+	rsa.le=KEY_E;
+	rsa.len=KEY_LEN;
+	route=device->route;
+	while(route)
+	{
+		if (route->device_index==transaction->deal.device_index[0])
+			break;
+		route=route->next;
+	}
+	memcpy(rsa.e,route->key.e,KEY_E);
+	memcpy(rsa.n,route->key.n,KEY_LEN);
+	i=rsa_enc(result,transaction->cipher,rsa.len,&rsa);
+	memset(&result[i],0,rsa.len-i);
+	if (memcmp(result,transaction->plain,rsa.len))
+		return 1;
+
+	return 0;
+}
+
 void transaction_recv(device_t *device)
 {
 	//queue->delete queue
+	uint32 trunk,branch;
+	uint32 pow[2];
+	//uint8 flag;
 	queue_t *queue,*prev;
 
 	queue=device->queue;
@@ -222,7 +298,35 @@ void transaction_recv(device_t *device)
 	{
 		if (queue->step==STEP_TRANSACTION)
 		{
-			//dingying重节点交易处理
+			//queue process
+			if (device->node==NODE_HEAVY)//若是重节点,则从dag中获取tip交易,pow值计算,交易验证,账本验证
+			{
+				flag=transaction_seek(trunk,branch,device);
+				if (!flag)
+		{
+			flag=transaction_verify(device,&device->tangle[trunk]);
+			if (flag)
+			{
+				LeaveCriticalSection(&g_cs);
+				break;
+			}
+			flag=transaction_verify(device,&device->tangle[branch]);
+			if (flag)
+			{
+				LeaveCriticalSection(&g_cs);
+				break;
+			}
+			pow[0]=transaction_pow(device,&device->tangle[trunk]);
+			pow[1]=transaction_pow(device,&device->tangle[branch]);
+		}
+		else
+			pow[0]=pow[1]=0;
+		flag=transaction_generate(device,pow);
+
+
+
+
+			//queue delete
 			if (queue==device->queue)
 			{
 				device->queue=queue->next;
@@ -269,11 +373,12 @@ transaction_t *transaction_generate(device_t *device)
 	uint32 i;
 	transaction_t *transaction;
 
-	if (device->device_index!=g_deal[g_dealindex].device_index)//非下一笔交易索引
+	if (device->device_index!=g_deal[g_dealindex].device_index[0])//非当前笔交易索引
 		return NULL;
 	if (g_deal[g_dealindex].token>device->token)//账本验证
 		return NULL;
 	transaction=new transaction_t;
+	transaction->flag=0;//给寻找和计算使用
 	transaction->index=++g_index;
 	memcpy(&transaction->deal,&g_deal[g_dealindex],sizeof(transaction_t));
 	_rand(transaction->plain,KEY_LEN);
@@ -328,50 +433,6 @@ void transaction_send(device_t *device,transaction_t *transaction)
 		queue_insert(device,queue);
 }
 
-uint8 transaction_seek(uint32 &trunk,uint32 &branch,device_t *device)
-{
-#if 0 
-	//search tip(random algorithm),原则上需要使用手动构造出较宽的tangle(判断tip),这里我使用自动构造tangle(判断solid)
-	uint32 i;
-	uint32 count;
-
-	if (!device->tangle_index)//genesis
-		return 1;
-	if (device->tangle_index==1)//point to genesis
-	{
-		trunk=0;
-		branch=0;
-	}
-	else
-	{
-		//find tip's index
-		count=0;
-		for (i=0;i<device->tangle_index;i++)
-			if (device->tangle[i].flag!=TRANSACTION_SOLID)
-				count++;
-		while(1)
-		{
-			trunk=rand()%count;
-			branch=rand()%count;
-			if (trunk!=branch)
-				break;
-		}
-		//find tip's hash
-		count=0;
-		for (i=0;i<device->tangle_index;i++)
-			if (device->tangle[i].flag!=TRANSACTION_SOLID)
-			{
-				if (trunk==count)
-					trunk=i;
-				if (branch==count)
-					branch=i;
-				count++;
-			}
-	}
-#endif
-	return 0;
-}
-
 //STEP_TANGLE
 void tangle_recv(device_t *device)
 {
@@ -404,9 +465,6 @@ void move_location(device_t *device)
 
 void process_device(device_t *device)
 {
-	uint32 trunk,branch;
-	uint32 pow[2];
-	uint8 flag;
 	transaction_t *transaction;
 
 	if (!device->queue)
@@ -478,27 +536,7 @@ void process_device(device_t *device)
 #if 0
 
 
-uint8 transaction_verify(device_t *device,transaction_t *transaction)
-{
-	//通过rsa公钥验签验证交易
-	uint32 i;
-	rsa_para para;
-	uint8 result[KEY_LEN];
 
-	para.le=4;
-	para.len=KEY_LEN;
-	for (i=0;i<device->key_index;i++)
-		if (device->key[i].device_index==transaction->device_index)
-			break;
-	para.e=device->key[i].buffer;
-	para.n=&device->key[i].buffer[para.le];
-	i=rsa_enc(result,transaction->cipher,para.len,&para);
-	memset(&result[i],0,para.len-i);
-	if (memcmp(result,transaction->plain,para.len))
-		return 1;
-
-	return 0;
-}
 
 uint32 transaction_pow(device_t *device,transaction_t *transaction)
 {

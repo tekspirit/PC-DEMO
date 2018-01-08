@@ -52,8 +52,10 @@ struct spv_t
 	deal_t deal;//交易原子
 	uint8 plain[KEY_LEN];//明文验证
 	uint8 cipher[KEY_LEN];//密文验证
-	uint32 trunk;//主交易节点->交易索引
-	uint32 branch;//从交易节点->交易索引
+	//uint32 index_trunk;//主交易索引
+	//uint32 index_branch;//从交易索引
+	transaction_t *trunk;//主交易节点
+	transaction_t *branch;//从交易节点
 };
 struct transaction_t
 {
@@ -63,9 +65,14 @@ struct transaction_t
 	uint8 plain[KEY_LEN];//明文验证
 	uint8 cipher[KEY_LEN];//密文验证
 	uint32 pow[2];//按计算规则得到的前序trunk/branch的pow值
-	uint8 flag;//交易状态.0-none,1-solid,2-tangle,3-milestone
-	uint32 trunk;//主交易节点->交易索引
-	uint32 branch;//从交易节点->交易索引
+	//uint8 status;//交易状态.0-none,1-solid,2-tangle,3-milestone
+	uint8 flag;
+
+	//uint32 index_trunk;//主交易索引
+	//uint32 index_branch;//从交易索引
+	transaction_t *trunk;//主交易节点
+	transaction_t *branch;//从交易节点
+	transaction_t *next;//tip链表使用
 	/*
 	uint32 weight_self;//自身权重
 	uint32 weight_accu;//累积权重
@@ -116,7 +123,8 @@ struct mainchain_t
 	uint32 dag_number;//区域数目
 	uint32 list_number;//节点数目
 	list_t *list;//节点属性列表
-	transaction_t *dag;//账本链表(全局账本)
+	transaction_t *dag;//账本dag链表(全局账本)
+	transaction_t *tip;//账本tip链表
 };
 struct device_t
 {
@@ -128,7 +136,8 @@ struct device_t
 	queue_t *queue;//消息队列
 	rsa_t rsa;//当前设备的公私钥对
 	uint32 token;//账户数额
-	transaction_t *dag;//账本链表(重节点-区域账本,轻节点-无账本)
+	transaction_t *dag;//账本dag链表(重节点-区域账本,轻节点-无账本)
+
 /*
 	//index_t *index;//设备索引链表
 	//dag
