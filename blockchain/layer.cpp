@@ -108,6 +108,22 @@ void key_generate(device_t *device)
 	}
 }
 
+//dag clear:清除dag中的flag
+uint32 dag_clear(transaction_t *transaction)
+{
+	if (!transaction->flag)
+		return 0;
+	transaction->flag=0;
+	if (transaction->trunk && transaction->branch)
+		return dag_clear(transaction->trunk)+dag_clear(transaction->branch);
+	if (transaction->trunk)
+		return dag_clear(transaction->trunk)+1;
+	if (transaction->branch)
+		return dag_clear(transaction->branch)+1;
+
+	return 1;
+}
+
 //compute tip:计算dag中的tip数
 uint32 compute_tip(transaction_t *dag)
 {

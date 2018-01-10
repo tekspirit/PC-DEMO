@@ -214,45 +214,42 @@ void connect_send(device_t *device)
 }
 
 //STEP_TRANSACTION
-//0-dag为空,1-dag非空
-uint8 transaction_seek(uint32 &trunk,uint32 &branch,device_t *device)
+uint8 transaction_seek(transaction_t *trunk,transaction_t *branch,device_t *device)
 {
-	//search tip(random algorithm),原则上需要使用手动构造出较宽的tangle(判断tip),这里我使用自动构造tangle(判断solid)
-	uint32 i;
-	uint32 count;
+	//search 2 tips(random algorithm):0-dag为空,1-dag非空.原则上需要使用手动构造出较宽的tangle(判断tip),这里我使用自动构造tangle(判断solid).
+	uint32 i,j,k;
+	transaction_t *transaction;
 
 	if (!device->dag)//genesis
 		return 1;
-	if (device->dag==1)//point to genesis
+	i=compute_tip(device->dag);
+	dag_clear(device->dag);
+	if (i==1)//point to genesis
 	{
-		trunk=0;
-		branch=0;
+		trunk=NULL;
+		branch=NULL;
 	}
 	else
 	{
 		//find tip's index
-		count=0;
-		for (i=0;i<device->tangle_index;i++)
-			if (device->tangle[i].flag!=TRANSACTION_SOLID)
-				count++;
 		while(1)
 		{
-			trunk=rand()%count;
-			branch=rand()%count;
-			if (trunk!=branch)
+			j=rand()%i;
+			k=rand()%i;
+			if (j!=k)
 				break;
 		}
-		//find tip's hash
-		count=0;
-		for (i=0;i<device->tangle_index;i++)
-			if (device->tangle[i].flag!=TRANSACTION_SOLID)
-			{
-				if (trunk==count)
-					trunk=i;
-				if (branch==count)
-					branch=i;
-				count++;
-			}
+		i=0;
+		transaction=device->dag;
+		while(transaction)
+		{
+			if (j==i)
+				trunk=transaction;
+			if (k==i)
+				branch=transaction;
+			i++;
+			transaction=transaction->next;
+		}
 	}
 
 	return 0;
@@ -260,7 +257,7 @@ uint8 transaction_seek(uint32 &trunk,uint32 &branch,device_t *device)
 
 uint8 transaction_verify(device_t *device,transaction_t *transaction)
 {
-	//通过rsa公钥验签验证交易
+	//通过rsa公钥验签验证交易。0-正确,1-错误
 	uint32 i;
 	rsa_t rsa;
 	route_t *route;
@@ -285,13 +282,101 @@ uint8 transaction_verify(device_t *device,transaction_t *transaction)
 	return 0;
 }
 
+uint32 transaction_pow(transaction_t *transaction)
+{
+	//通过sha256计算hash pow
+	uint64 i;
+	uint32 length;
+	crypt_sha256 *sha256;
+	uint8 content[KEY_LEN+1],result[HASH_LEN];
+
+	length=KEY_LEN;
+	memcpy(content,transaction->plain,length);
+	sha256=new crypt_sha256;
+	for (i=1;i<0x100000000;i++)
+	{
+		length=_add(content,content,1,length);
+		sha256->sha256_init();
+		sha256->sha256_update(content,length);
+		sha256->sha256_final(result);
+		if (_bitlen(result,HASH_LEN)<=HASH_LEN*8-COMPARE_LEN)
+			break;
+	}
+	if (i==0x100000000)
+		i=0;
+	delete sha256;
+
+	return (uint32)i;
+}
+/*
+void transaction_modify()
+{
+		//clip trunk/branch into dag
+		insert=new transaction_t;
+		insert->index=*(uint32 *)queue->data;
+		memcpy(&insert->deal,queue->data+1*sizeof(uint32),sizeof(deal_t));
+		memcpy(insert->plain,queue->data+1*sizeof(uint32)+sizeof(deal_t),KEY_LEN);
+		memcpy(insert->cipher,queue->data+1*sizeof(uint32)+sizeof(deal_t)+KEY_LEN,KEY_LEN);
+		insert->flag=0;
+		i=0;
+		transaction=device->dag;
+		while(transaction)
+		{
+			if (trunk==i)
+				point[0]=
+
+
+			transaction=transaction->next;
+		}
+
+
+		queue=new queue_t;
+	queue->step=STEP_TRANSACTION;
+	queue->data=new uint8[sizeof(spv_t)];
+	*(uint32 *)queue->data=transaction->index;
+	memcpy(queue->data+1*sizeof(uint32),&transaction->deal,sizeof(deal_t));
+	memcpy(queue->data+1*sizeof(uint32)+sizeof(deal_t),transaction->plain,KEY_LEN);
+	memcpy(queue->data+1*sizeof(uint32)+sizeof(deal_t)+KEY_LEN,transaction->cipher,KEY_LEN);
+	*(uint32 *)(queue->data+1*sizeof(uint32)+sizeof(deal_t)+2*KEY_LEN)=transaction->trunk;
+	*(uint32 *)(queue->data+2*sizeof(uint32)+sizeof(deal_t)+2*KEY_LEN)=transaction->branch;
+
+uint32 index;//交易索引
+	deal_t deal;//交易原子
+	//uint8 type;//交易类型.0-普通信息,1-有价信息
+	uint8 plain[KEY_LEN];//明文验证
+	uint8 cipher[KEY_LEN];//密文验证
+	uint32 pow[2];//按计算规则得到的前序trunk/branch的pow值
+	//uint8 status;//交易状态.0-none,1-solid,2-tangle,3-milestone
+	uint8 flag;
+
+	//uint32 index_trunk;//主交易索引
+	//uint32 index_branch;//从交易索引
+	transaction_t *trunk;//主交易节点
+	transaction_t *branch;//从交易节点
+	transaction_t *next;//tip链表使用
+
+
+		count=0;
+		for (i=0;i<device->tangle_index;i++)
+			if (device->tangle[i].flag!=TRANSACTION_SOLID)
+			{
+				if (trunk==count)
+					trunk=i;
+				if (branch==count)
+					branch=i;
+				count++;
+			}
+	}
+
+	return 0;
+}*/
+
 void transaction_recv(device_t *device)
 {
 	//queue->delete queue
-	uint32 trunk,branch;
+	transaction_t *trunk,*branch;
 	uint32 pow[2];
-	//uint8 flag;
-	queue_t *queue,*prev;
+	queue_t *queue,*prev,*insert;
 
 	queue=device->queue;
 	while(queue)
@@ -299,31 +384,42 @@ void transaction_recv(device_t *device)
 		if (queue->step==STEP_TRANSACTION)
 		{
 			//queue process
-			if (device->node==NODE_HEAVY)//若是重节点,则从dag中获取tip交易,pow值计算,交易验证,账本验证
+			do
 			{
-				flag=transaction_seek(trunk,branch,device);
-				if (!flag)
-		{
-			flag=transaction_verify(device,&device->tangle[trunk]);
-			if (flag)
-			{
-				LeaveCriticalSection(&g_cs);
-				break;
-			}
-			flag=transaction_verify(device,&device->tangle[branch]);
-			if (flag)
-			{
-				LeaveCriticalSection(&g_cs);
-				break;
-			}
-			pow[0]=transaction_pow(device,&device->tangle[trunk]);
-			pow[1]=transaction_pow(device,&device->tangle[branch]);
-		}
-		else
-			pow[0]=pow[1]=0;
-		flag=transaction_generate(device,pow);
+				if (queue->data && device->node==NODE_HEAVY)//若是重节点且有交易内容,则从dag中获取tip交易,pow值计算,交易验证,账本验证
+				{
+					flag=transaction_seek(trunk,branch,device);
+					if (!flag)
+					{
+						flag=transaction_verify(device,trunk);
+						if (flag)
+						{
+							insert=new queue_t;
+							insert->step=STEP_FAIL;
+							insert->data=new uint8[sizeof(status_t)];
+							*(uint32 *)insert->data=trunk->index;
+							*(uint32 *)(insert->data+1*sizeof(uint32))=
 
-
+							memcpy(insert->data+1*sizeof(uint32),trunk->deal,sizeof(deal_t));
+							memcpy(insert->data+1*sizeof(uint32)+sizeof(deal_t),queue->data+1*sizeof(uint32)+sizeof(deal_t),KEY_LEN);
+							memcpy(insert->data+1*sizeof(uint32)+sizeof(deal_t)+KEY_LEN,queue->data+1*sizeof(uint32)+sizeof(deal_t)+KEY_LEN,KEY_LEN);
+							*(uint32 *)(insert->data+1*sizeof(uint32)+sizeof(deal_t)+2*KEY_LEN)=find_tip(*(uint32 *)(queue->data+1*sizeof(uint32)+sizeof(deal_t)+2*KEY_LEN));
+							*(uint32 *)(insert->data+2*sizeof(uint32)+sizeof(deal_t)+2*KEY_LEN)=find_tip(*(uint32 *)(queue->data+2*sizeof(uint32)+sizeof(deal_t)+2*KEY_LEN));
+							*(uint32 *)(insert->data+3*sizeof(uint32)+sizeof(deal_t)+2*KEY_LEN)=find_tip(*(uint32 *)(queue->data+1*sizeof(uint32)+sizeof(deal_t)+2*KEY_LEN));
+							queue_insert(&g_mainchain,insert);
+						}
+						flag=transaction_verify(device,&device->tangle[branch]);
+						if (flag)
+						{
+						}
+						pow[0]=transaction_pow(device,&device->tangle[trunk]);
+						pow[1]=transaction_pow(device,&device->tangle[branch]);
+					}
+					else
+						pow[0]=pow[1]=0;
+					flag=transaction_generate(device,pow);
+				}
+			}while(0);
 
 
 			//queue delete
@@ -538,32 +634,7 @@ void process_device(device_t *device)
 
 
 
-uint32 transaction_pow(device_t *device,transaction_t *transaction)
-{
-	//通过sha256计算hash pow
-	uint64 i;
-	uint32 length;
-	crypt_sha256 *sha256;
-	uint8 content[KEY_LEN+1],result[HASH_LEN];
 
-	length=KEY_LEN;
-	memcpy(content,transaction->plain,length);
-	sha256=new crypt_sha256;
-	for (i=1;i<0x100000000;i++)
-	{
-		length=_add(content,content,1,length);
-		sha256->sha256_init();
-		sha256->sha256_update(content,length);
-		sha256->sha256_final(result);
-		if (_bitlen(result,HASH_LEN)<=HASH_LEN*8-COMPARE_LEN)
-			break;
-	}
-	if (i==0x100000000)
-		i=0;
-	delete sha256;
-
-	return (uint32)i;
-}
 
 
 
