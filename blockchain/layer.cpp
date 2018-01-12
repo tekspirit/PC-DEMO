@@ -134,7 +134,8 @@ uint32 compute_tip(transaction_t *dag)
 	transaction=dag;
 	while(transaction)
 	{
-		number++;
+		if (!transaction->flag)//ÕýÈ·µÄtip
+			number++;
 		transaction=transaction->next;
 	}
 

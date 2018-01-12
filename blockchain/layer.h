@@ -10,17 +10,21 @@
 
 #define STEP_CONNECT 0
 #define STEP_TRANSACTION 1
-#define STEP_PASS 2
-#define STEP_FAIL 3
-#define STEP_MOVE 4
+#define STEP_STATUS 2
+#define STEP_MOVE 3
 
 #define KEY_LEN 4 //密钥对字节数
 #define KEY_E 4 //公钥e字节数
 #define KEY_MASK 0 //指数盲化字节数
 
-#define STATUS_PASS 0
-#define STATUS_FAIL_TRANSACTION 1
-#define STATUS_FAIL_LEDGER 2
+#define TRANSACTION_NONE 0 //未加入tip队列，未做地址验证/账本验证
+#define TRANSACTION_TIP 1 //已加入tip队列，未做地址验证/账本验证
+#define TRANSACTION_DAG 2 //已加入dag队列，已做地址验证/账本验证
+//#define TRANSACTION_MILESTONE 3 //
+
+#define STATUS_DONE 0 //验证通过
+#define STATUS_DEVICE 1 //地址验证错误
+#define STATUS_LEDGER 2 //账本验证错误
 
 //#define TRANSACTION_NORMAL 0 //普通交易
 //#define TRANSACTION_VALUE 1 //有价交易(需账本验证)
@@ -53,31 +57,33 @@ struct deal_t
 };
 struct spv_t
 {
+	uint8 transaction;//交易状态.0-none,1-tip,2-dag
 	uint32 index;//交易索引
 	deal_t deal;//交易原子
 	uint8 plain[KEY_LEN];//明文验证
 	uint8 cipher[KEY_LEN];//密文验证
+	uint32 pow[2];//按计算规则得到的前序trunk/branch的pow值
 	uint32 trunk;//主交易索引
 	uint32 branch;//从交易索引
 };
 struct status_t
 {
-	uint32 index;//交易索引
 	uint32 status;//交易状态(正确/错误)
+	uint32 index;//交易索引
 };
 struct transaction_t
 {
 	uint32 index;//交易索引
 	deal_t deal;//交易原子
-	//uint8 type;//交易类型.0-普通信息,1-有价信息
 	uint8 plain[KEY_LEN];//明文验证
 	uint8 cipher[KEY_LEN];//密文验证
 	uint32 pow[2];//按计算规则得到的前序trunk/branch的pow值
-	//uint8 status;//交易状态.0-none,1-solid,2-tangle,3-milestone
-	uint8 flag;
-
-	//uint32 index_trunk;//主交易索引
-	//uint32 index_branch;//从交易索引
+	//
+	uint8 transaction;//交易状态.0-none,1-tip,2-dag
+	uint8 flag;//dag:0-未计算,1-已计算.tip:0-正确,1-错误
+	uint16 reserved;
+	//uint8 type;//交易类型.0-普通信息,1-有价信息
+	//
 	transaction_t *trunk;//主交易节点
 	transaction_t *branch;//从交易节点
 	transaction_t *next;//tip链表使用
@@ -132,7 +138,7 @@ struct mainchain_t
 	uint32 list_number;//节点数目
 	list_t *list;//节点属性列表
 	transaction_t *dag;//账本dag链表(全局账本)
-	transaction_t *tip;//账本tip链表
+
 };
 struct device_t
 {

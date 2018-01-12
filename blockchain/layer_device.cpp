@@ -220,14 +220,15 @@ uint8 transaction_seek(transaction_t *trunk,transaction_t *branch,device_t *devi
 	uint32 i,j,k;
 	transaction_t *transaction;
 
-	if (!device->dag)//genesis
+	if (!device->dag)//no genesis
 		return 1;
 	i=compute_tip(device->dag);
-	dag_clear(device->dag);
-	if (i==1)//point to genesis
+	if (!i)//no correct tip or no genesis
+		return 1;
+	if (i==1)
 	{
-		trunk=NULL;
-		branch=NULL;
+		j=0;
+		k=0;
 	}
 	else
 	{
@@ -239,17 +240,20 @@ uint8 transaction_seek(transaction_t *trunk,transaction_t *branch,device_t *devi
 			if (j!=k)
 				break;
 		}
-		i=0;
-		transaction=device->dag;
-		while(transaction)
+	}
+	i=0;
+	transaction=device->dag;
+	while(transaction)
+	{
+		if (!transaction->flag)//正确的tip
 		{
 			if (j==i)
 				trunk=transaction;
 			if (k==i)
 				branch=transaction;
 			i++;
-			transaction=transaction->next;
 		}
+		transaction=transaction->next;
 	}
 
 	return 0;
@@ -257,12 +261,13 @@ uint8 transaction_seek(transaction_t *trunk,transaction_t *branch,device_t *devi
 
 uint8 transaction_verify(device_t *device,transaction_t *transaction)
 {
-	//通过rsa公钥验签验证交易。0-正确,1-错误
+	//交易验证：使用rsa公钥验签验证交易地址，验证交易账本。0-正确,1-交易地址错误,2-交易账本错误
 	uint32 i;
 	rsa_t rsa;
 	route_t *route;
 	uint8 result[KEY_LEN];
 
+	//get device
 	rsa.le=KEY_E;
 	rsa.len=KEY_LEN;
 	route=device->route;
@@ -272,14 +277,18 @@ uint8 transaction_verify(device_t *device,transaction_t *transaction)
 			break;
 		route=route->next;
 	}
+	//地址验证
 	memcpy(rsa.e,route->key.e,KEY_E);
 	memcpy(rsa.n,route->key.n,KEY_LEN);
 	i=rsa_enc(result,transaction->cipher,rsa.len,&rsa);
 	memset(&result[i],0,rsa.len-i);
 	if (memcmp(result,transaction->plain,rsa.len))
-		return 1;
+		return STATUS_DEVICE;
+	//账本验证
+	if (transaction->deal.token>route->token)
+		return STATUS_LEDGER;
 
-	return 0;
+	return STATUS_DONE;
 }
 
 uint32 transaction_pow(transaction_t *transaction)
@@ -308,73 +317,11 @@ uint32 transaction_pow(transaction_t *transaction)
 
 	return (uint32)i;
 }
-/*
-void transaction_modify()
-{
-		//clip trunk/branch into dag
-		insert=new transaction_t;
-		insert->index=*(uint32 *)queue->data;
-		memcpy(&insert->deal,queue->data+1*sizeof(uint32),sizeof(deal_t));
-		memcpy(insert->plain,queue->data+1*sizeof(uint32)+sizeof(deal_t),KEY_LEN);
-		memcpy(insert->cipher,queue->data+1*sizeof(uint32)+sizeof(deal_t)+KEY_LEN,KEY_LEN);
-		insert->flag=0;
-		i=0;
-		transaction=device->dag;
-		while(transaction)
-		{
-			if (trunk==i)
-				point[0]=
-
-
-			transaction=transaction->next;
-		}
-
-
-		queue=new queue_t;
-	queue->step=STEP_TRANSACTION;
-	queue->data=new uint8[sizeof(spv_t)];
-	*(uint32 *)queue->data=transaction->index;
-	memcpy(queue->data+1*sizeof(uint32),&transaction->deal,sizeof(deal_t));
-	memcpy(queue->data+1*sizeof(uint32)+sizeof(deal_t),transaction->plain,KEY_LEN);
-	memcpy(queue->data+1*sizeof(uint32)+sizeof(deal_t)+KEY_LEN,transaction->cipher,KEY_LEN);
-	*(uint32 *)(queue->data+1*sizeof(uint32)+sizeof(deal_t)+2*KEY_LEN)=transaction->trunk;
-	*(uint32 *)(queue->data+2*sizeof(uint32)+sizeof(deal_t)+2*KEY_LEN)=transaction->branch;
-
-uint32 index;//交易索引
-	deal_t deal;//交易原子
-	//uint8 type;//交易类型.0-普通信息,1-有价信息
-	uint8 plain[KEY_LEN];//明文验证
-	uint8 cipher[KEY_LEN];//密文验证
-	uint32 pow[2];//按计算规则得到的前序trunk/branch的pow值
-	//uint8 status;//交易状态.0-none,1-solid,2-tangle,3-milestone
-	uint8 flag;
-
-	//uint32 index_trunk;//主交易索引
-	//uint32 index_branch;//从交易索引
-	transaction_t *trunk;//主交易节点
-	transaction_t *branch;//从交易节点
-	transaction_t *next;//tip链表使用
-
-
-		count=0;
-		for (i=0;i<device->tangle_index;i++)
-			if (device->tangle[i].flag!=TRANSACTION_SOLID)
-			{
-				if (trunk==count)
-					trunk=i;
-				if (branch==count)
-					branch=i;
-				count++;
-			}
-	}
-
-	return 0;
-}*/
 
 void transaction_recv(device_t *device)
 {
 	//queue->delete queue
-	transaction_t *trunk,*branch;
+	transaction_t *trunk,*branch,*transaction;
 	uint32 pow[2];
 	queue_t *queue,*prev,*insert;
 
@@ -386,38 +333,48 @@ void transaction_recv(device_t *device)
 			//queue process
 			do
 			{
-				if (queue->data && device->node==NODE_HEAVY)//若是重节点且有交易内容,则从dag中获取tip交易,pow值计算,交易验证,账本验证
+				if (queue->data && device->node==NODE_HEAVY)//若是重节点且有交易内容
 				{
-					flag=transaction_seek(trunk,branch,device);
-					if (!flag)
+					switch(*(uint32 *)queue->data)
+					do
 					{
-						flag=transaction_verify(device,trunk);
-						if (flag)
+						//从tip队列中获取两笔tip交易
+						flag=transaction_seek(trunk,branch,device);
+						if (!flag)
 						{
-							insert=new queue_t;
-							insert->step=STEP_FAIL;
-							insert->data=new uint8[sizeof(status_t)];
-							*(uint32 *)insert->data=trunk->index;
-							*(uint32 *)(insert->data+1*sizeof(uint32))=
-
-							memcpy(insert->data+1*sizeof(uint32),trunk->deal,sizeof(deal_t));
-							memcpy(insert->data+1*sizeof(uint32)+sizeof(deal_t),queue->data+1*sizeof(uint32)+sizeof(deal_t),KEY_LEN);
-							memcpy(insert->data+1*sizeof(uint32)+sizeof(deal_t)+KEY_LEN,queue->data+1*sizeof(uint32)+sizeof(deal_t)+KEY_LEN,KEY_LEN);
-							*(uint32 *)(insert->data+1*sizeof(uint32)+sizeof(deal_t)+2*KEY_LEN)=find_tip(*(uint32 *)(queue->data+1*sizeof(uint32)+sizeof(deal_t)+2*KEY_LEN));
-							*(uint32 *)(insert->data+2*sizeof(uint32)+sizeof(deal_t)+2*KEY_LEN)=find_tip(*(uint32 *)(queue->data+2*sizeof(uint32)+sizeof(deal_t)+2*KEY_LEN));
-							*(uint32 *)(insert->data+3*sizeof(uint32)+sizeof(deal_t)+2*KEY_LEN)=find_tip(*(uint32 *)(queue->data+1*sizeof(uint32)+sizeof(deal_t)+2*KEY_LEN));
-							queue_insert(&g_mainchain,insert);
+							//地址验证+账本验证
+							flag=transaction_verify(device,trunk);
+							if (flag)
+							{
+								trunk->flag=1;
+								insert=new queue_t;
+								insert->step=STEP_STATUS;
+								insert->data=new uint8[sizeof(status_t)];
+								*(uint32 *)insert->data=flag;
+								*(uint32 *)(insert->data+1*sizeof(uint32))=trunk->index;
+								queue_insert(&g_mainchain,insert);
+								continue;
+							}
+							flag=transaction_verify(device,branch);
+							if (flag)
+							{
+								branch->flag=1;
+								insert=new queue_t;
+								insert->step=STEP_STATUS;
+								insert->data=new uint8[sizeof(status_t)];
+								*(uint32 *)insert->data=flag;
+								*(uint32 *)(insert->data+1*sizeof(uint32))=branch->index;
+								queue_insert(&g_mainchain,insert);
+								continue;
+							}
+							//pow值计算
+							pow[0]=transaction_pow(trunk);
+							pow[1]=transaction_pow(branch);
 						}
-						flag=transaction_verify(device,&device->tangle[branch]);
-						if (flag)
-						{
-						}
-						pow[0]=transaction_pow(device,&device->tangle[trunk]);
-						pow[1]=transaction_pow(device,&device->tangle[branch]);
-					}
-					else
-						pow[0]=pow[1]=0;
-					flag=transaction_generate(device,pow);
+						else
+							pow[0]=pow[1]=0;
+					}while(0);
+					//交易
 				}
 			}while(0);
 
@@ -474,13 +431,14 @@ transaction_t *transaction_generate(device_t *device)
 	if (g_deal[g_dealindex].token>device->token)//账本验证
 		return NULL;
 	transaction=new transaction_t;
-	transaction->flag=0;//给寻找和计算使用
 	transaction->index=++g_index;
 	memcpy(&transaction->deal,&g_deal[g_dealindex],sizeof(transaction_t));
 	_rand(transaction->plain,KEY_LEN);
 	i=_mod(transaction->plain,transaction->plain,&device->rsa.n,KEY_LEN,KEY_LEN);
 	memset(&transaction->plain[i],0,KEY_LEN-i);
 	transaction_signature(transaction,device);
+	transaction->transaction=TRANSACTION_NONE;
+	transaction->flag=0;//给寻找和计算使用
 	g_dealindex++;
 
 	return transaction;
@@ -488,6 +446,7 @@ transaction_t *transaction_generate(device_t *device)
 
 void transaction_send(device_t *device,transaction_t *transaction)
 {
+	//transaction->queue
 	route_t *route;
 	queue_t *queue;
 
@@ -514,12 +473,14 @@ void transaction_send(device_t *device,transaction_t *transaction)
 	queue=new queue_t;
 	queue->step=STEP_TRANSACTION;
 	queue->data=new uint8[sizeof(spv_t)];
-	*(uint32 *)queue->data=transaction->index;
-	memcpy(queue->data+1*sizeof(uint32),&transaction->deal,sizeof(deal_t));
-	memcpy(queue->data+1*sizeof(uint32)+sizeof(deal_t),transaction->plain,KEY_LEN);
-	memcpy(queue->data+1*sizeof(uint32)+sizeof(deal_t)+KEY_LEN,transaction->cipher,KEY_LEN);
-	*(uint32 *)(queue->data+1*sizeof(uint32)+sizeof(deal_t)+2*KEY_LEN)=transaction->trunk;
-	*(uint32 *)(queue->data+2*sizeof(uint32)+sizeof(deal_t)+2*KEY_LEN)=transaction->branch;
+	*(uint32 *)queue->data=TRANSACTION_NONE;
+	*(uint32 *)(queue->data+1*sizeof(uint32))=transaction->index;
+	memcpy(queue->data+2*sizeof(uint32),&transaction->deal,sizeof(deal_t));
+	memcpy(queue->data+2*sizeof(uint32)+sizeof(deal_t),transaction->plain,KEY_LEN);
+	memcpy(queue->data+2*sizeof(uint32)+sizeof(deal_t)+KEY_LEN,transaction->cipher,KEY_LEN);
+	memset(queue->data+2*sizeof(uint32)+sizeof(deal_t)+2*KEY_LEN,0,2*sizeof(uint32));
+	*(uint32 *)(queue->data+4*sizeof(uint32)+sizeof(deal_t)+2*KEY_LEN)=0;
+	*(uint32 *)(queue->data+5*sizeof(uint32)+sizeof(deal_t)+2*KEY_LEN)=0;
 	if (device->node==NODE_LIGHT)//若是轻节点,则将交易传给第一重节点
 	{
 		if (route)
@@ -616,6 +577,24 @@ void process_device(device_t *device)
 		break;
 	}
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -829,75 +808,5 @@ uint8 tangle_recv(device_t *device)
 }
 
 
-//1.generate transaction by random(一种是输入签名,一种是传输信息). broadcast
-//2.tangle join(search tip). broadcast
-//3.transaction validation:if most of tip reference to old transactions, then solid.validation->broadcast->waiting for device's response,synch device's queue*
-//4.ledger validation:check each solid transactions, then milestone. broadcast
-while(1)
-	{
-		switch(task)
-		{
-		case 0://search tip/verify/generate transaction and broadcast
-			EnterCriticalSection(&g_cs);
-			flag=transaction_search(trunk,branch,device);
-			if (!flag)
-			{
-				flag=transaction_verify(device,&device->tangle[trunk]);
-				if (flag)
-				{
-					LeaveCriticalSection(&g_cs);
-					break;
-				}
-				flag=transaction_verify(device,&device->tangle[branch]);
-				if (flag)
-				{
-					LeaveCriticalSection(&g_cs);
-					break;
-				}
-				pow[0]=transaction_pow(device,&device->tangle[trunk]);
-				pow[1]=transaction_pow(device,&device->tangle[branch]);
-			}
-			else
-				pow[0]=pow[1]=0;
-			flag=transaction_generate(device,pow);
-			//if (flag)
-			//	print_return(device,task,flag);
-			LeaveCriticalSection(&g_cs);
-			break;
-		case 1://recv transaction
-			EnterCriticalSection(&g_cs);
-			flag=transaction_recv(device);
-			//if (flag)
-			//	print_return(device,task,flag);
-			LeaveCriticalSection(&g_cs);
-			break;
-		case 2://join tangle and broadcast
-			EnterCriticalSection(&g_cs);
-			flag=tangle_join(device,trunk,branch);
-			//if (flag)
-			//	print_return(device,task,flag);
-			LeaveCriticalSection(&g_cs);
-			break;
-		case 3://recv tangle
-			EnterCriticalSection(&g_cs);
-			flag=tangle_recv(device);
-			//if (flag)
-			//	print_return(device,task,flag);
-			LeaveCriticalSection(&g_cs);
-			break;
-		case 4:
-			EnterCriticalSection(&g_cs);
-			tangle_check();
-			LeaveCriticalSection(&g_cs);
-			break;
-		}
-		//EnterCriticalSection(&g_cs);
-		//printf("thread_device%ld task=%d\r\n",device->device_index,task);
-		//LeaveCriticalSection(&g_cs);
-		task++;
-		if (task==5)
-			task=0;
-		//Sleep(10);
-		//while(1);
-	}
+
 #endif
