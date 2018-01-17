@@ -10,7 +10,7 @@
 
 #define STEP_CONNECT 0
 #define STEP_TRANSACTION 1
-#define STEP_STATUS 2
+#define STEP_LEDGER 2
 #define STEP_MOVE 3
 
 #define KEY_LEN 4 //密钥对字节数
@@ -57,19 +57,20 @@ struct deal_t
 };
 struct spv_t
 {
-	uint8 transaction;//交易状态.0-none,1-tip,2-dag
+	//uint32 transaction;//交易状态.0-none,1-tip,2-dag
 	uint32 index;//交易索引
 	deal_t deal;//交易原子
 	uint8 plain[KEY_LEN];//明文验证
 	uint8 cipher[KEY_LEN];//密文验证
-	uint32 pow[2];//按计算规则得到的前序trunk/branch的pow值
-	uint32 trunk;//主交易索引
-	uint32 branch;//从交易索引
+	//uint32 pow[2];//按计算规则得到的前序trunk/branch的pow值
+	//uint32 trunk;//主交易索引
+	//uint32 branch;//从交易索引
 };
-struct status_t
+struct ledger_t
 {
 	uint32 status;//交易状态(正确/错误)
 	uint32 index;//交易索引
+	uint32 token;//交易数额
 };
 struct transaction_t
 {
@@ -111,7 +112,7 @@ struct list_t
 	uint32 dag_index;//区域索引
 	uint32 device_index;//设备索引
 	key_t key;//公钥
-	uint32 token;//账户数额
+	uint32 token[2];//账户数额(0-可使用数额,1-冻结数额)
 	uint8 node;//0-重节点,1-轻节点
 };
 struct route_t
@@ -138,7 +139,6 @@ struct mainchain_t
 	uint32 list_number;//节点数目
 	list_t *list;//节点属性列表
 	transaction_t *dag;//账本dag链表(全局账本)
-
 };
 struct device_t
 {
@@ -149,7 +149,7 @@ struct device_t
 	route_t *route;//连接设备路由链表
 	queue_t *queue;//消息队列
 	rsa_t rsa;//当前设备的公私钥对
-	uint32 token;//账户数额
+	uint32 token[2];//账户数额(0-可使用数额,1-冻结数额)
 	transaction_t *dag;//账本dag链表(重节点-区域账本,轻节点-无账本)
 
 /*

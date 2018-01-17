@@ -143,7 +143,8 @@ void main(int argc,char* argv[])
 		*(uint32 *)queue->data=0;//align problem?
 		queue_insert(&g_device[i],queue);
 		key_generate(&g_device[i]);
-		g_device[i].token=token;
+		g_device[i].token[0]=token;
+		g_device[i].token[1]=0;
 		g_device[i].dag=NULL;
 
 
@@ -192,11 +193,23 @@ void main(int argc,char* argv[])
 	{
 #if 1
 		EnterCriticalSection(&g_cs);
+		/*
 		flag=0;
 		if (g_mainchain.queue && g_mainchain.queue->step==STEP_CONNECT)
 			flag=1;
 		for (i=0;i<g_devicenum[0]+g_devicenum[1];i++)
 			if (g_device[i].queue && g_device[i].queue->step==STEP_CONNECT)
+			{
+				flag=1;
+				break;
+			}
+		if (!flag)
+			printf("ok");*/
+		flag=0;
+		if (g_mainchain.queue && g_mainchain.queue->step!=STEP_MOVE)
+			flag=1;
+		for (i=0;i<g_devicenum[0]+g_devicenum[1];i++)
+			if (g_device[i].queue && g_device[i].queue->step!=STEP_MOVE)
 			{
 				flag=1;
 				break;

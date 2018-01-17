@@ -27,6 +27,24 @@ void route_delete(route_t *route)
 	delete next;
 }
 
+//route find node by device_index
+uint8 route_findnode(device_t *device,uint32 device_index)
+{
+	route_t *route;
+
+	if (device->device_index==device_index)
+		return device->node;
+	route=device->route;
+	while(route)
+	{
+		if (route->device_index==device_index)
+			break;
+		route=route->next;
+	}
+
+	return route->node;
+}
+
 //queue insert into device->queue
 void queue_insert(device_t *device,queue_t *queue)
 {
@@ -122,6 +140,28 @@ uint32 dag_clear(transaction_t *transaction)
 		return dag_clear(transaction->branch)+1;
 
 	return 1;
+}
+
+//dag delete:删除dag中的某项tip
+void dag_delete(mainchain_t *mainchain,transaction_t *transaction)
+{
+	transaction_t *prev,*point;
+
+	point=mainchain->dag;
+	while(point)
+	{
+		if (point==transaction)
+		{
+			if (point==mainchain->dag)
+				mainchain->dag=mainchain->dag->next;
+			else
+				prev->next=point->next;
+			delete point;
+			break;
+		}
+		prev=point;
+		point=point->next;
+	}
 }
 
 //compute tip:计算dag中的tip数
