@@ -6,7 +6,6 @@ extern uint32 g_devicestep;//设备步进值
 extern uint32 g_dealnumber;//交易原子列表个数
 extern uint32 g_dealindex;//交易原子列表索引
 extern deal_t *g_deal;//交易原子列表
-extern CRITICAL_SECTION g_cs;
 extern device_t *g_device;//设备数组
 extern mainchain_t g_mainchain;//主链
 extern volatile uint32 g_index;//临时用来统计交易号码的(以后会用hash_t代替,计数从1开始)
@@ -240,7 +239,7 @@ uint8 transaction_verify(device_t *device,transaction_t *transaction)
 	if (memcmp(result,transaction->plain,rsa.len))
 		return STATUS_DEVICE;
 	//账本验证
-	if (transaction->deal.token>route->token)
+	if (transaction->deal.token>route->token[0])
 		return STATUS_LEDGER;
 
 	return STATUS_DONE;
@@ -249,9 +248,9 @@ uint8 transaction_verify(device_t *device,transaction_t *transaction)
 void transaction_recv(device_t *device)
 {
 	//queue->delete queue
-	uint8 node;
-	deal_t *deal;
+	uint8 flag,node;
 	queue_t *queue,*prev,*insert;
+	transaction_t transaction;
 
 	queue=device->queue;
 	while(queue)
@@ -262,9 +261,12 @@ void transaction_recv(device_t *device)
 			if (queue->data && device->node==NODE_HEAVY)//若是重节点且有交易内容
 			{
 				//地址验证+账本验证
-				deal=(deal_t *)(queue->data+1*sizeof(uint32));
-				flag=transaction_verify(device,deal->device_index[0]);
-				node=route_findnode(device,deal->device_index[0]);
+				transaction.index=*(uint32 *)queue->data;
+				memcpy(&transaction.deal,queue->data+1*sizeof(uint32),sizeof(deal_t));
+				memcpy(transaction.plain,queue->data+1*sizeof(uint32)+sizeof(deal_t),KEY_LEN);
+				memcpy(transaction.cipher,queue->data+1*sizeof(uint32)+sizeof(deal_t)+KEY_LEN,KEY_LEN);
+				flag=transaction_verify(device,&transaction);
+				node=route_find(device,transaction.deal.device_index[0]);
 				if (flag)//error
 				{
 					if (node==NODE_LIGHT)//源为轻节点,则传回轻节点去更新
@@ -274,13 +276,13 @@ void transaction_recv(device_t *device)
 						insert->data=new uint8[sizeof(ledger_t)];
 						*(uint32 *)insert->data=flag;
 						*(uint32 *)(insert->data+1*sizeof(uint32))=*(uint32 *)queue->data;
-						*(uint32 *)(insert->data+2*sizeof(uint32))=deal->token;
-						queue_insert(&g_device[deal->device_index[1]],insert);
+						*(uint32 *)(insert->data+2*sizeof(uint32))=transaction.deal.token;
+						queue_insert(&g_device[transaction.deal.device_index[1]],insert);
 					}
 					else//源为重节点(自己),则更新token
 					{
-						device->token[0]+=deal->token;
-						device->token[1]-=deal->token;
+						device->token[0]+=transaction.deal.token;
+						device->token[1]-=transaction.deal.token;
 					}
 				}
 				else//correct则传入服务器
@@ -296,8 +298,8 @@ void transaction_recv(device_t *device)
 					//update token
 					if (node==NODE_LIGHT)//源为轻节点,则更新当前重节点token
 					{
-						device->token[0]-=deal->token;
-						device->token[1]+=deal->token;
+						device->token[0]-=transaction.deal.token;
+						device->token[1]+=transaction.deal.token;
 					}
 				}
 			}
@@ -356,11 +358,11 @@ transaction_t *transaction_generate(device_t *device)
 	transaction->index=++g_index;
 	memcpy(&transaction->deal,&g_deal[g_dealindex],sizeof(transaction_t));
 	_rand(transaction->plain,KEY_LEN);
-	i=_mod(transaction->plain,transaction->plain,&device->rsa.n,KEY_LEN,KEY_LEN);
+	i=_mod(transaction->plain,transaction->plain,device->rsa.n,KEY_LEN,KEY_LEN);
 	memset(&transaction->plain[i],0,KEY_LEN-i);
 	transaction_signature(transaction,device);
-	transaction->transaction=TRANSACTION_NONE;
-	transaction->flag=0;//给寻找和计算使用
+	//transaction->transaction=TRANSACTION_NONE;
+	//transaction->flag=0;//给寻找和计算使用
 	g_dealindex++;
 
 	return transaction;
@@ -426,7 +428,7 @@ void ledger_recv(device_t *device)
 			//queue process
 			if (device->node==NODE_HEAVY)//若是重节点
 			{
-				node=route_findnode(device,*(uint32 *)(queue->data+1*sizeof(uint32)));
+				node=route_find(device,*(uint32 *)(queue->data+1*sizeof(uint32)));
 				if (node==NODE_LIGHT)//目标节点为轻节点,则传递至轻节点更新
 				{
 					insert=new queue_t;

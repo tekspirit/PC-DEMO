@@ -97,6 +97,10 @@ SOURCE=.\crypt_rsa.cpp
 # End Source File
 # Begin Source File
 
+SOURCE=.\crypt_sha256.cpp
+# End Source File
+# Begin Source File
+
 SOURCE=.\include.cpp
 # End Source File
 # Begin Source File
@@ -126,6 +130,10 @@ SOURCE=.\crypt_bignum.h
 # Begin Source File
 
 SOURCE=.\crypt_rsa.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\crypt_sha256.h
 # End Source File
 # Begin Source File
 

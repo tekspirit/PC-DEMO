@@ -13,17 +13,14 @@
 //typedef
 //struct
 //function
-/*
-void route_mark(device_t *device,uint32 device_index);
-route_t *route_check(device_t *device);
-route_t *route_exist(device_t *device,uint32 index);
-void device_recurse(device_t *device);
-void device_location(device_t *device);
-void device_release(device_t *device);
-void print_status(void);
-void print_route(void);
-*/
 void connect_recv(device_t *device);
 void connect_seek(device_t *device);
 void connect_send(device_t *device);
+uint8 transaction_verify(device_t *device,transaction_t *transaction);
+void transaction_recv(device_t *device);
+void transaction_signature(transaction_t *transaction,device_t *device);
+transaction_t *transaction_generate(device_t *device);
+void transaction_send(device_t *device,transaction_t *transaction);
+void ledger_recv(device_t *device);
+void ledger_send(device_t *device);
 void process_device(device_t *device);
