@@ -71,7 +71,6 @@ void connect_recv(mainchain_t *mainchain)
 			list[i].device_index=index.index[i];
 			memcpy(list[i].key.e,&index.key[i*(KEY_E+KEY_LEN)],KEY_E);
 			memcpy(list[i].key.n,&index.key[i*(KEY_E+KEY_LEN)+KEY_E],KEY_LEN);
-			list[i].token=index.token[i];
 			list[i].node=index.node[i];
 		}
 		k=index.number;
@@ -86,7 +85,7 @@ void connect_recv(mainchain_t *mainchain)
 				list[k].device_index=mainchain->list[j].device_index;
 				memcpy(list[k].key.e,&mainchain->list[j].key.e,KEY_E);
 				memcpy(list[k].key.n,&mainchain->list[j].key.n,KEY_LEN);
-				list[k].token=mainchain->list[j].token;
+				memcpy(list[k].token,mainchain->list[j].token,2*sizeof(uint32));
 				list[k].node=mainchain->list[j].node;
 				k++;
 			}
@@ -164,7 +163,6 @@ uint8 transaction_verify(mainchain_t *mainchain,transaction_t *transaction)
 	//交易验证：使用rsa公钥验签验证交易地址，验证交易账本。0-正确,1-交易地址错误,2-交易账本错误
 	uint32 i;
 	rsa_t rsa;
-	route_t *route;
 	uint8 result[KEY_LEN];
 
 	//get device
@@ -176,6 +174,8 @@ uint8 transaction_verify(mainchain_t *mainchain,transaction_t *transaction)
 			break;
 	}
 	//地址验证
+	rsa.e=new uint8[rsa.le];
+	rsa.n=new uint8[rsa.len];
 	memcpy(rsa.e,mainchain->list[i].key.e,KEY_E);
 	memcpy(rsa.n,mainchain->list[i].key.n,KEY_LEN);
 	i=rsa_enc(result,transaction->cipher,rsa.len,&rsa);
@@ -295,6 +295,7 @@ void transaction_recv(mainchain_t *mainchain)
 				//find 2 tips & verify them(address/ledger), calculate pow
 				do
 				{
+					trunk=branch=NULL;
 					flag=transaction_seek(trunk,branch,mainchain);
 					if (!flag)//dag exist
 					{

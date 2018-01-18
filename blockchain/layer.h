@@ -48,7 +48,7 @@ struct index_t
 	uint32 number;//待处理索引数目
 	uint32 *index;//待处理索引列表
 	uint8 *key;//待处理索引公钥
-	uint32 *token;//账户数额
+	uint32 *token;//账户数额(0-可使用数额,1-冻结数额)
 	uint8 *node;//0-重节点,1-轻节点
 };
 struct deal_t
@@ -120,7 +120,7 @@ struct route_t
 	//uint32 hops;//跳跃间隔
 	//uint32 *path;//路由路径
 	key_t key;//公钥
-	uint32 token[2];//账户数额
+	uint32 token[2];//账户数额(0-可使用数额,1-冻结数额)
 	uint8 node;//0-重节点,1-轻节点
 	route_t *next;
 };

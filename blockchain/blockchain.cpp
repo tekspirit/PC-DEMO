@@ -179,8 +179,14 @@ void main(int argc,char* argv[])
 	}
 	g_mainchain.queue=NULL;
 	g_mainchain.dag_number=0;
-	g_mainchain.list_number=0;
-	g_mainchain.list=NULL;
+	g_mainchain.list_number=g_devicenum[0]+g_devicenum[1];
+	g_mainchain.list=new list_t[g_mainchain.list_number];
+	for (i=0;i<g_devicenum[0]+g_devicenum[1];i++)
+	{
+		g_mainchain.list[i].device_index=i;
+		g_mainchain.list[i].token[0]=token;
+		g_mainchain.list[i].token[1]=0;
+	}
 	g_mainchain.dag=NULL;
 	thread_handle=CreateThread(NULL,0,thread_mainchain,(PVOID)&g_mainchain,0,&thread_id);
 	if (!thread_handle)
@@ -205,6 +211,7 @@ void main(int argc,char* argv[])
 			}
 		if (!flag)
 			printf("ok");*/
+		
 		flag=0;
 		if (g_mainchain.queue && g_mainchain.queue->step!=STEP_MOVE)
 			flag=1;
