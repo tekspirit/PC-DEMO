@@ -3,8 +3,7 @@
 extern uint32 g_devicenum[2];//设备个数
 extern uint32 g_devicerange;//设备坐标范围
 extern uint32 g_devicestep;//设备步进值
-extern uint32 g_dealnumber;//交易原子列表个数
-extern uint32 g_dealindex;//交易原子列表索引
+extern uint32 g_number;//交易原子列表个数
 extern deal_t *g_deal;//交易原子列表
 extern device_t *g_device;//设备数组
 extern mainchain_t g_mainchain;//主链
@@ -217,6 +216,7 @@ uint8 transaction_verify(device_t *device,transaction_t *transaction)
 {
 	//交易验证：使用rsa公钥验签验证交易地址，验证交易账本。0-正确,1-交易地址错误,2-交易账本错误
 	uint32 i,j;
+	uint8 flag;
 	rsa_t rsa;
 	route_t *route;
 	uint8 *e,*n;
@@ -230,6 +230,7 @@ uint8 transaction_verify(device_t *device,transaction_t *transaction)
 		e=device->rsa.e;
 		n=device->rsa.n;
 		j=device->token[0];
+		flag=0;
 	}
 	else
 	{
@@ -243,6 +244,7 @@ uint8 transaction_verify(device_t *device,transaction_t *transaction)
 		e=route->key.e;
 		n=route->key.n;
 		j=route->token[0];
+		flag=1;
 	}
 	//地址验证
 	rsa.e=new uint8[rsa.le];
@@ -254,7 +256,7 @@ uint8 transaction_verify(device_t *device,transaction_t *transaction)
 	if (memcmp(result,transaction->plain,rsa.len))
 		return STATUS_DEVICE;
 	//账本验证
-	if (transaction->deal.token>j)
+	if (flag && transaction->deal.token>j)//源为轻节点时需要验证
 		return STATUS_LEDGER;
 
 	return STATUS_DONE;
@@ -365,20 +367,24 @@ transaction_t *transaction_generate(device_t *device)
 	uint32 i;
 	transaction_t *transaction;
 
-	if (device->device_index!=g_deal[g_dealindex].device_index[0])//非当前笔交易索引
+	if (g_index==g_number)//已完成所有交易生成
 		return NULL;
-	if (g_deal[g_dealindex].token>device->token[0])//账本验证
+	if (device->device_index!=g_deal[g_index].device_index[0])//非当前笔交易索引
 		return NULL;
+	if (g_deal[g_index].token>device->token[0])//账本验证
+	{
+		g_index++;
+		return NULL;
+	}
 	transaction=new transaction_t;
-	transaction->index=++g_index;
-	memcpy(&transaction->deal,&g_deal[g_dealindex],sizeof(transaction_t));
+	memcpy(&transaction->deal,&g_deal[g_index],sizeof(transaction_t));
 	_rand(transaction->plain,KEY_LEN);
 	i=_mod(transaction->plain,transaction->plain,device->rsa.n,KEY_LEN,KEY_LEN);
 	memset(&transaction->plain[i],0,KEY_LEN-i);
 	transaction_signature(transaction,device);
+	transaction->index=++g_index;
 	//transaction->transaction=TRANSACTION_NONE;
 	//transaction->flag=0;//给寻找和计算使用
-	g_dealindex++;
 
 	return transaction;
 }
@@ -390,7 +396,7 @@ void transaction_send(device_t *device,transaction_t *transaction)
 	queue_t *queue;
 
 	//update queue(self)
-	if (!transaction || device->node==NODE_LIGHT)
+	if (!transaction)
 	{
 		queue=new queue_t;
 		queue->step=STEP_TRANSACTION;
@@ -407,6 +413,16 @@ void transaction_send(device_t *device,transaction_t *transaction)
 				break;
 			route=route->next;
 		}
+		if (!route)//尚未连接重节点,更新自己账本
+		{
+			device->token[0]+=transaction->deal.token;
+			device->token[1]-=transaction->deal.token;
+			queue=new queue_t;
+			queue->step=STEP_TRANSACTION;
+			queue->data=NULL;
+			queue_insert(device,queue);
+			return;
+		}
 	}
 	//update queue(other)
 	queue=new queue_t;
@@ -417,10 +433,7 @@ void transaction_send(device_t *device,transaction_t *transaction)
 	memcpy(queue->data+1*sizeof(uint32)+sizeof(deal_t),transaction->plain,KEY_LEN);
 	memcpy(queue->data+1*sizeof(uint32)+sizeof(deal_t)+KEY_LEN,transaction->cipher,KEY_LEN);
 	if (device->node==NODE_LIGHT)//若是轻节点,则将交易传给第一重节点
-	{
-		if (route)
-			queue_insert(&g_device[route->device_index],queue);
-	}
+		queue_insert(&g_device[route->device_index],queue);
 	else//若是重节点,则更新给自己
 		queue_insert(device,queue);
 	//update token

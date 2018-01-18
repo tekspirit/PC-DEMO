@@ -26,19 +26,9 @@
 #define STATUS_DONE 0 //验证通过
 #define STATUS_DEVICE 1 //地址验证错误
 #define STATUS_LEDGER 2 //账本验证错误
+#define STATUS_CONNECT 3 //未连接重节点
 
-//#define TRANSACTION_NORMAL 0 //普通交易
-//#define TRANSACTION_VALUE 1 //有价交易(需账本验证)
-/*
-#define TAG_NONE 0 //未交易认证transaction
-#define TRANSACTION_TIP 1 //已链入tangle成为tip
-#define TRANSACTION_TANGLE 2 //已链入tangle并被其他交易指引
-#define TRANSACTION_SOLID 3 //已交易认证transaction
-#define TRANSACTION_MILESTONE 4 //已账本验证milestone
-//#define QUEUE_LENGTH 0x20
-*/
 //#define TIMER_CONNECT 1 //组网更新时间(重节点向服务器)
-
 
 
 //typedef

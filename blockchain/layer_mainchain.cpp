@@ -3,8 +3,7 @@
 extern uint32 g_devicenum[2];//设备个数
 extern uint32 g_devicerange;//设备坐标范围
 extern uint32 g_devicestep;//设备步进值
-extern uint32 g_dealnumber;//交易原子列表个数
-extern uint32 g_dealindex;//交易原子列表索引
+extern uint32 g_number;//交易原子列表个数
 extern deal_t *g_deal;//交易原子列表
 extern device_t *g_device;//设备数组
 extern mainchain_t g_mainchain;//主链

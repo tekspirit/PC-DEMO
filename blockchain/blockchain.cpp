@@ -4,8 +4,7 @@
 uint32 g_devicenum[2];//设备个数.0-重节点,1-轻节点
 uint32 g_devicerange;//设备坐标范围
 uint32 g_devicestep;//设备步进值
-uint32 g_dealnumber;//交易原子列表个数
-uint32 g_dealindex;//交易原子列表索引
+uint32 g_number;//交易原子列表个数
 deal_t *g_deal;//交易原子列表
 CRITICAL_SECTION g_cs;
 device_t *g_device;//设备数组
@@ -87,7 +86,7 @@ void main(int argc,char* argv[])
 	token=atol(&buf[6]);//token
 	fgets(buf,1000,file);//[transaction]
 	i=ftell(file);
-	g_dealnumber=0;
+	g_number=0;
 	while(1)
 	{
 		if (feof(file))
@@ -96,11 +95,11 @@ void main(int argc,char* argv[])
 		fgets(buf,1000,file);
 		if (!strcmp(buf,""))
 			break;
-		g_dealnumber++;
+		g_number++;
 	}
-	g_deal=new deal_t[g_dealnumber];
+	g_deal=new deal_t[g_number];
 	fseek(file,i,SEEK_SET);
-	g_dealnumber=0;
+	g_number=0;
 	while(1)
 	{
 		if (feof(file))
@@ -113,21 +112,20 @@ void main(int argc,char* argv[])
 		point[0]=buf;
 		point[1]=strchr(point[0],',');
 		*point[1]='\0';
-		g_deal[g_dealnumber].device_index[0]=atol(point[0]);
+		g_deal[g_number].device_index[0]=atol(point[0]);
 		point[0]=point[1]+1;
 		point[1]=strchr(point[0],',');
 		*point[1]='\0';
-		g_deal[g_dealnumber].device_index[1]=atol(point[0]);
+		g_deal[g_number].device_index[1]=atol(point[0]);
 		point[0]=point[1]+1;
-		g_deal[g_dealnumber].token=atol(point[0]);
-		g_dealnumber++;
+		g_deal[g_number].token=atol(point[0]);
+		g_number++;
 	}
 	fclose(file);
 	//0.initial device/timer/thread_device/thread_mainchain/cs
 	InitializeCriticalSection(&g_cs);
 	srand((unsigned)time(NULL));
 	g_index=0;
-	g_dealindex=0;
 	g_device=new device_t[g_devicenum[0]+g_devicenum[1]];
 	for (i=0;i<g_devicenum[0]+g_devicenum[1];i++)
 	{
@@ -213,8 +211,8 @@ void main(int argc,char* argv[])
 			printf("ok");*/
 		
 		flag=0;
-		if (g_mainchain.queue && g_mainchain.queue->step!=STEP_MOVE)
-			flag=1;
+		//if (g_mainchain.queue && g_mainchain.queue->step!=STEP_MOVE)
+		//	flag=1;
 		for (i=0;i<g_devicenum[0]+g_devicenum[1];i++)
 			if (g_device[i].queue && g_device[i].queue->step!=STEP_MOVE)
 			{
