@@ -13,13 +13,11 @@ extern volatile uint32 g_index;//ÁÙÊ±ÓÃÀ´Í³¼Æ½»Ò×ºÅÂëµÄ(ÒÔºó»áÓÃhash_t´úÌæ,¼ÆÊı´
 void connect_recv(mainchain_t *mainchain)
 {
 	//queue->list
-	uint32 i,j,k;
-	uint32 dag_index;
+	uint32 i,j;
 	uint32 *dag;
 	uint8 flag;
 	queue_t *queue,*remove,*prev;
 	index_t index;
-	list_t *list;
 
 	flag=0;
 	while(1)
@@ -39,74 +37,44 @@ void connect_recv(mainchain_t *mainchain)
 		index.index=(uint32 *)(queue->data+1*sizeof(uint32));
 		index.key=queue->data+(1+index.number)*sizeof(uint32);
 		index.token=(uint32 *)(queue->data+(1+index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN));
-		index.node=queue->data+(1+2*index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN);
-		//compute list_number
-		dag_index=mainchain->dag_number;
-		for (j=0;j<index.number;j++)
-		{
-			for (i=0;i<mainchain->list_number;i++)
-				if (mainchain->list[i].device_index==index.index[j])
-					break;
-			if (i!=mainchain->list_number)
-			{
-				dag_index=mainchain->list[i].dag_index;
-				break;
-			}
-		}
-		k=index.number;
-		for (j=0;j<mainchain->list_number;j++)
-		{
-			for (i=0;i<index.number;i++)
-				if (index.index[i]==mainchain->list[j].device_index)
-					break;
-			if (i==index.number && dag_index!=mainchain->list[j].dag_index)//other device_index & different dag_index
-				k++;
-		}
-		//fill list
-		list=new list_t[k];
+		index.node=queue->data+(1+3*index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN);
+		//update list
 		for (i=0;i<index.number;i++)
 		{
-			list[i].dag_index=dag_index;
-			list[i].device_index=index.index[i];
-			memcpy(list[i].key.e,&index.key[i*(KEY_E+KEY_LEN)],KEY_E);
-			memcpy(list[i].key.n,&index.key[i*(KEY_E+KEY_LEN)+KEY_E],KEY_LEN);
-			list[i].node=index.node[i];
-		}
-		k=index.number;
-		for (j=0;j<mainchain->list_number;j++)
-		{
-			for (i=0;i<index.number;i++)
+			for (j=0;j<mainchain->list_number;j++)
 				if (index.index[i]==mainchain->list[j].device_index)
 					break;
-			if (i==index.number && dag_index!=mainchain->list[j].dag_index)//other device_index & different dag_index
+			if (j!=mainchain->list_number)//find it(Î´·¢ÏÖµÄÔİÊ±²»×ö´¦Àí)
 			{
-				list[k].dag_index=mainchain->list[j].dag_index;
-				list[k].device_index=mainchain->list[j].device_index;
-				memcpy(list[k].key.e,&mainchain->list[j].key.e,KEY_E);
-				memcpy(list[k].key.n,&mainchain->list[j].key.n,KEY_LEN);
-				memcpy(list[k].token,mainchain->list[j].token,2*sizeof(uint32));
-				list[k].node=mainchain->list[j].node;
-				k++;
+				mainchain->list[j].dag_index=mainchain->dag_number+1;
+				memcpy(&mainchain->list[j].key,&index.key[i],KEY_E+KEY_LEN);
+				mainchain->list[j].node=index.node[i];
 			}
 		}
-		list_delete(mainchain);
-		mainchain->list=new list_t[k];
-		memcpy(mainchain->list,list,k*sizeof(list_t));
-		delete[] list;
-		mainchain->list_number=k;
 		//compute dag_number
 		mainchain->dag_number=0;
 		for (i=0;i<mainchain->list_number;i++)
 		{
+			if (!mainchain->list[i].dag_index)
+				continue;
 			for (j=0;j<mainchain->dag_number;j++)
 				if (mainchain->list[i].dag_index==dag[j])
 					break;
 			if (j==mainchain->dag_number)
 			{
-				dag=j ? (uint32 *)realloc(dag,(j+1)*sizeof(uint32)) : (uint32 *)malloc((j+1)*sizeof(uint32));
-				dag[j]=j;
-				mainchain->dag_number++;
+				dag=mainchain->dag_number ? (uint32 *)realloc(dag,(mainchain->dag_number+1)*sizeof(uint32)) : (uint32 *)malloc((mainchain->dag_number+1)*sizeof(uint32));
+				dag[mainchain->dag_number++]=mainchain->list[i].dag_index;
 			}
+		}
+		//modify dag_index
+		for (i=0;i<mainchain->list_number;i++)
+		{
+			if (!mainchain->list[i].dag_index)
+				continue;
+			for (j=0;j<mainchain->dag_number;j++)
+				if (mainchain->list[i].dag_index==dag[j])
+					break;
+			mainchain->list[i].dag_index=j+1;
 		}
 		if (mainchain->dag_number)
 			free(dag);

@@ -38,15 +38,55 @@ uint8 route_find(device_t *device,uint32 device_index)
 //queue insert into device->queue
 void queue_insert(device_t *device,queue_t *queue)
 {
-	queue->next=device->queue;
-	device->queue=queue;
+	queue_t *next;
+
+	if (queue->step==STEP_CONNECT)
+	{
+		queue->next=device->queue;
+		device->queue=queue;
+	}
+	else
+	{
+		if (!device->queue)
+		{
+			queue->next=device->queue;
+			device->queue=queue;
+		}
+		else
+		{
+			next=device->queue;
+			while(next->next) next=next->next;
+			queue->next=NULL;
+			next->next=queue;
+		}
+	}
 }
 
 //queue insert into mainchain->queue
 void queue_insert(mainchain_t *mainchain,queue_t *queue)
 {
-	queue->next=mainchain->queue;
-	mainchain->queue=queue;
+	queue_t *next;
+
+	if (queue->step==STEP_CONNECT)
+	{
+		queue->next=mainchain->queue;
+		mainchain->queue=queue;
+	}
+	else
+	{
+		if (!mainchain->queue)
+		{
+			queue->next=mainchain->queue;
+			mainchain->queue=queue;
+		}
+		else
+		{
+			next=mainchain->queue;
+			while(next->next) next=next->next;
+			queue->next=NULL;
+			next->next=queue;
+		}
+	}
 }
 
 //queue delete from device->queue

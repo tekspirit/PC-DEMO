@@ -97,7 +97,7 @@ struct key_t
 };
 struct list_t
 {
-	uint32 dag_index;//区域索引
+	uint32 dag_index;//区域索引(默认为0,从1开始有效)
 	uint32 device_index;//设备索引
 	key_t key;//公钥
 	uint32 token[2];//账户数额(0-可使用数额,1-冻结数额)
