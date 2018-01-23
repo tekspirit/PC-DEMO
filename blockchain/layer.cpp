@@ -118,28 +118,6 @@ void transaction_insert(mainchain_t *mainchain,transaction_t *transaction)
 	mainchain->dag=transaction;
 }
 
-//dag insert into mainchain->dag
-void dag_insert(mainchain_t *mainchain,transaction_t *transaction)
-{
-	transaction_t *prev,*point;
-
-	point=mainchain->dag;
-	while(point)
-	{
-		if (point==transaction)
-		{
-			if (point==mainchain->dag)
-				mainchain->dag=mainchain->dag->next;
-			else
-				prev->next=point->next;
-			point->transaction=TRANSACTION_DAG;
-			break;
-		}
-		prev=point;
-		point=point->next;
-	}
-}
-
 //dag delete:删除dag中的某项tip
 void dag_delete(mainchain_t *mainchain,transaction_t *transaction)
 {
@@ -227,6 +205,12 @@ uint32 dag_num(transaction_t *dag)
 	}
 
 	return number;
+}
+
+//dag tip:动态调整tip个数(初始构造、动态运行时调整宽度)
+uint32 dag_tip(void)
+{
+	return 5;
 }
 
 //dag height:创世交易至当前交易所有路径中的最长路径(NP-Hard问题)

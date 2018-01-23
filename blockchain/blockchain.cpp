@@ -55,7 +55,7 @@ void main(int argc,char* argv[])
 	uint32 token;//初始化资金
 	//
 	uint32 i;
-	uint8 flag;
+	//uint8 flag;
 	int8 buf[1000],*point[2];
 	FILE *file;
 	HANDLE thread_handle;
@@ -182,8 +182,7 @@ void main(int argc,char* argv[])
 	for (i=0;i<g_devicenum[0]+g_devicenum[1];i++)
 	{
 		g_mainchain.list[i].device_index=i;
-		g_mainchain.list[i].token[0]=token;
-		g_mainchain.list[i].token[1]=0;
+		g_mainchain.list[i].token=token;
 	}
 	g_mainchain.dag=NULL;
 	thread_handle=CreateThread(NULL,0,thread_mainchain,(PVOID)&g_mainchain,0,&thread_id);
@@ -210,7 +209,8 @@ void main(int argc,char* argv[])
 		if (!flag)
 			printf("ok");*/
 		
-		flag=0;
+		//flag=0;
+		/*
 		//if (g_mainchain.queue && g_mainchain.queue->step!=STEP_MOVE)
 		//	flag=1;
 		for (i=0;i<g_devicenum[0]+g_devicenum[1];i++)
@@ -220,7 +220,10 @@ void main(int argc,char* argv[])
 				break;
 			}
 		if (!flag)
-			printf("ok");
+			printf("ok");*/
+		//if (g_index==g_number)
+		//	printf("ok");
+
 		/*
 		for (i=0;i<g_devicenum;i++)
 			printf("%d",g_device[i].step);

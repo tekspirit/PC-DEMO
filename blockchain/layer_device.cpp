@@ -292,14 +292,15 @@ void transaction_recv(device_t *device)
 						insert->step=STEP_LEDGER;
 						insert->data=new uint8[sizeof(ledger_t)];
 						*(uint32 *)insert->data=flag;
-						*(uint32 *)(insert->data+1*sizeof(uint32))=*(uint32 *)queue->data;
+						*(uint32 *)(insert->data+1*sizeof(uint32))=transaction.deal.device_index[0];
 						*(uint32 *)(insert->data+2*sizeof(uint32))=transaction.deal.token;
-						queue_insert(&g_device[transaction.deal.device_index[1]],insert);
+						queue_insert(&g_device[transaction.deal.device_index[0]],insert);
 					}
 					else//源为重节点(自己),则更新token
 					{
 						device->token[0]+=transaction.deal.token;
 						device->token[1]-=transaction.deal.token;
+						printf("device(%ld):%ld-%ld\r\n",device->device_index,device->token[0],device->token[1]);
 					}
 				}
 				else//correct则传入服务器
@@ -317,6 +318,7 @@ void transaction_recv(device_t *device)
 					{
 						device->token[0]-=transaction.deal.token;
 						device->token[1]+=transaction.deal.token;
+						printf("device(%ld):%ld-%ld\r\n",device->device_index,device->token[0],device->token[1]);
 					}
 				}
 			}
@@ -385,6 +387,7 @@ transaction_t *transaction_generate(device_t *device)
 	transaction->index=++g_index;
 	//transaction->transaction=TRANSACTION_NONE;
 	//transaction->flag=0;//给寻找和计算使用
+	printf("transaction(%ld-%ld):%ld\r\n",transaction->deal.device_index[0],transaction->deal.device_index[1],transaction->deal.token);
 
 	return transaction;
 }
@@ -415,8 +418,11 @@ void transaction_send(device_t *device,transaction_t *transaction)
 		}
 		if (!route)//尚未连接重节点,更新自己账本
 		{
+			//update ledger
 			device->token[0]+=transaction->deal.token;
 			device->token[1]-=transaction->deal.token;
+			printf("device(%ld):%ld-%ld\r\n",device->device_index,device->token[0],device->token[1]);
+			//
 			queue=new queue_t;
 			queue->step=STEP_TRANSACTION;
 			queue->data=NULL;
@@ -436,9 +442,10 @@ void transaction_send(device_t *device,transaction_t *transaction)
 		queue_insert(&g_device[route->device_index],queue);
 	else//若是重节点,则更新给自己
 		queue_insert(device,queue);
-	//update token
+	//update ledger
 	device->token[0]-=transaction->deal.token;
 	device->token[1]+=transaction->deal.token;
+	printf("device(%ld):%ld-%ld\r\n",device->device_index,device->token[0],device->token[1]);
 }
 
 //STEP_LEDGER
@@ -465,26 +472,40 @@ void ledger_recv(device_t *device)
 					memcpy(insert,queue,sizeof(ledger_t));
 					queue_insert(&g_device[*(uint32 *)(queue->data+1*sizeof(uint32))],insert);
 				}
-				else//若为重节点,update token
+				else//若为重节点,update ledger
 				{
-					if (*(uint32 *)queue->data==STATUS_DONE)
-						device->token[1]-=*(uint32 *)(queue->data+2*sizeof(uint32));
-					else
+					switch(*(uint32 *)queue->data)
 					{
+					case STATUS_SRC:
+						device->token[1]-=*(uint32 *)(queue->data+2*sizeof(uint32));
+						break;
+					case STATUS_DST:
+						device->token[0]+=*(uint32 *)(queue->data+2*sizeof(uint32));
+						break;
+					default:
 						device->token[0]+=*(uint32 *)(queue->data+2*sizeof(uint32));
 						device->token[1]-=*(uint32 *)(queue->data+2*sizeof(uint32));
+						break;
 					}
+					printf("device(%ld):%ld-%ld\r\n",device->device_index,device->token[0],device->token[1]);
 				}
 			}
-			else//若为轻节点,update token
+			else//若为轻节点,update ledger
 			{
-				if (*(uint32 *)queue->data==STATUS_DONE)
-					device->token[1]-=*(uint32 *)(queue->data+2*sizeof(uint32));
-				else
+				switch(*(uint32 *)queue->data)
 				{
+				case STATUS_SRC:
+					device->token[1]-=*(uint32 *)(queue->data+2*sizeof(uint32));
+					break;
+				case STATUS_DST:
+					device->token[0]+=*(uint32 *)(queue->data+2*sizeof(uint32));
+					break;
+				default:
 					device->token[0]+=*(uint32 *)(queue->data+2*sizeof(uint32));
 					device->token[1]-=*(uint32 *)(queue->data+2*sizeof(uint32));
+					break;
 				}
+				printf("device(%ld):%ld-%ld\r\n",device->device_index,device->token[0],device->token[1]);
 			}
 			//queue delete
 			if (queue==device->queue)
@@ -524,7 +545,8 @@ void ledger_send(device_t *device)
 	queue_t *queue;
 
 	queue=new queue_t;
-	queue->step=STEP_MOVE;
+	//queue->step=STEP_MOVE;
+	queue->step=STEP_TRANSACTION;
 	queue->data=NULL;
 	queue_insert(device,queue);
 }

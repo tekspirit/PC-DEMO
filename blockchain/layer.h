@@ -27,6 +27,8 @@
 #define STATUS_DEVICE 1 //地址验证错误
 #define STATUS_LEDGER 2 //账本验证错误
 #define STATUS_CONNECT 3 //未连接重节点
+#define STATUS_SRC 4 //源地址
+#define STATUS_DST 5 //目标地址
 
 //#define TIMER_CONNECT 1 //组网更新时间(重节点向服务器)
 
@@ -57,7 +59,7 @@ struct spv_t
 struct ledger_t
 {
 	uint32 status;//交易状态(正确/错误)
-	uint32 index;//交易索引
+	uint32 device_index;//设备索引(类似于唯一物理地址)
 	uint32 token;//交易数额
 };
 struct transaction_t
@@ -100,13 +102,13 @@ struct list_t
 	uint32 dag_index;//区域索引(默认为0,从1开始有效)
 	uint32 device_index;//设备索引
 	key_t key;//公钥
-	uint32 token[2];//账户数额(0-可使用数额,1-冻结数额)
+	uint32 token;//账户数额
 	uint8 node;//0-重节点,1-轻节点
 };
 struct route_t
 {
 	uint8 flag;//0-未连接,1-连接
-	uint32 device_index;//终设备索引(类似于唯一物理地址)
+	uint32 device_index;//设备索引(类似于唯一物理地址)
 	//uint32 hops;//跳跃间隔
 	//uint32 *path;//路由路径
 	key_t key;//公钥
@@ -123,8 +125,8 @@ struct queue_t
 struct mainchain_t
 {
 	queue_t *queue;//消息队列
-	uint32 dag_number;//区域数目
 	uint32 list_number;//节点数目
+	uint32 dag_number;//区域数目
 	list_t *list;//节点属性列表
 	transaction_t *dag;//账本dag链表(全局账本)
 };
@@ -168,10 +170,10 @@ void queue_insert(mainchain_t *mainchain,queue_t *queue);
 void queue_delete(device_t *device);
 void list_delete(mainchain_t *mainchain);
 void transaction_insert(mainchain_t *mainchain,transaction_t *transaction);
-void dag_insert(mainchain_t *mainchain,transaction_t *transaction);
 void dag_delete(mainchain_t *mainchain,transaction_t *transaction);
 uint32 dag_clear(transaction_t *transaction);
 uint32 dag_tipnum(transaction_t *dag);
 uint32 dag_dagnum(transaction_t *transaction);
 uint32 dag_num(transaction_t *dag);
+uint32 dag_tip(void);
 void key_generate(device_t *device);
