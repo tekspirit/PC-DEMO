@@ -192,15 +192,18 @@ void connect_send(device_t *device)
 		route=route->next;
 	}
 	//fill mainchain
-	queue=new queue_t;
-	queue->step=STEP_CONNECT;
-	queue->data=new uint8[(1+3*index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN)+index.number*sizeof(uint8)];
-	*(uint32 *)queue->data=index.number;//align problem?
-	memcpy(queue->data+1*sizeof(uint32),index.index,index.number*sizeof(uint32));
-	memcpy(queue->data+(1+index.number)*sizeof(uint32),index.key,index.number*(KEY_E+KEY_LEN));
-	memcpy(queue->data+(1+index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN),index.token,2*index.number*sizeof(uint32));
-	memcpy(queue->data+(1+3*index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN),index.node,index.number*sizeof(uint8));
-	queue_insert(&g_mainchain,queue);
+	if (device->node==NODE_HEAVY)//若重节点,则传给服务器
+	{
+		queue=new queue_t;
+		queue->step=STEP_CONNECT;
+		queue->data=new uint8[(1+3*index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN)+index.number*sizeof(uint8)];
+		*(uint32 *)queue->data=index.number;//align problem?
+		memcpy(queue->data+1*sizeof(uint32),index.index,index.number*sizeof(uint32));
+		memcpy(queue->data+(1+index.number)*sizeof(uint32),index.key,index.number*(KEY_E+KEY_LEN));
+		memcpy(queue->data+(1+index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN),index.token,2*index.number*sizeof(uint32));
+		memcpy(queue->data+(1+3*index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN),index.node,index.number*sizeof(uint8));
+		queue_insert(&g_mainchain,queue);
+	}
 	//release
 	delete[] index.index;
 	delete[] index.key;
@@ -375,6 +378,7 @@ transaction_t *transaction_generate(device_t *device)
 		return NULL;
 	if (g_deal[g_index].token>device->token[0])//账本验证
 	{
+		printf("transaction(%ld-%ld):%ld,error\r\n",g_deal[g_index].device_index[0],g_deal[g_index].device_index[1],g_deal[g_index].token);
 		g_index++;
 		return NULL;
 	}
@@ -419,10 +423,10 @@ void transaction_send(device_t *device,transaction_t *transaction)
 		if (!route)//尚未连接重节点,更新自己账本
 		{
 			//update ledger
-			device->token[0]+=transaction->deal.token;
-			device->token[1]-=transaction->deal.token;
+			device->token[0]-=transaction->deal.token;
+			device->token[1]+=transaction->deal.token;
 			printf("device(%ld):%ld-%ld\r\n",device->device_index,device->token[0],device->token[1]);
-			//
+			//update queue
 			queue=new queue_t;
 			queue->step=STEP_TRANSACTION;
 			queue->data=NULL;
@@ -594,6 +598,8 @@ void process_device(device_t *device)
 		break;
 	case STEP_TRANSACTION:
 		//recv
+		if (((uint32)device & 0xff000000)!=0x02000000)
+			device=device;
 		transaction_recv(device);//recv & process device's queue
 		//process
 		transaction=transaction_generate(device);//generate transaction

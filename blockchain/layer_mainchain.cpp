@@ -42,14 +42,11 @@ void connect_recv(mainchain_t *mainchain)
 		for (i=0;i<index.number;i++)
 		{
 			for (j=0;j<mainchain->list_number;j++)
-				if (index.index[i]==mainchain->list[j].device_index)
+				if (index.index[i]==mainchain->list[j].device_index)//must find it
 					break;
-			if (j!=mainchain->list_number)//find it(未发现的暂时不做处理)
-			{
-				mainchain->list[j].dag_index=mainchain->dag_number+1;
-				memcpy(&mainchain->list[j].key,&index.key[i*(KEY_E+KEY_LEN)],KEY_E+KEY_LEN);
-				mainchain->list[j].node=index.node[i];
-			}
+			mainchain->list[j].dag_index=mainchain->dag_number+1;
+			memcpy(&mainchain->list[j].key,&index.key[i*(KEY_E+KEY_LEN)],KEY_E+KEY_LEN);
+			mainchain->list[j].node=index.node[i];
 		}
 		//compute dag_number
 		mainchain->dag_number=0;
@@ -228,6 +225,22 @@ uint32 transaction_pow(transaction_t *transaction)
 	return (uint32)i;
 }
 
+uint32 transaction_device(mainchain_t *mainchain,uint32 device_index)
+{
+	uint32 i,j;
+
+	for (i=0;i<mainchain->list_number;i++)
+		if (device_index==mainchain->list[i].device_index)//must find it
+			break;
+	if (mainchain->list[i].node==NODE_HEAVY)//若本身为重节点,则取该节点
+		return mainchain->list[i].device_index;
+	for (j=0;j<mainchain->list_number;j++)
+		if (mainchain->list[i].dag_index==mainchain->list[j].dag_index && mainchain->list[j].dag_index==NODE_HEAVY)//找到同一dag的重节点
+			break;
+
+	return mainchain->list[j].device_index;
+}
+
 void transaction_recv(mainchain_t *mainchain)
 {
 	//queue->dag
@@ -278,7 +291,7 @@ void transaction_recv(mainchain_t *mainchain)
 							*(uint32 *)insert->data=flag;
 							*(uint32 *)(insert->data+1*sizeof(uint32))=trunk->deal.device_index[0];
 							*(uint32 *)(insert->data+2*sizeof(uint32))=trunk->deal.token;
-							queue_insert(&g_device[trunk->deal.device_index[0]],insert);
+							queue_insert(&g_device[transaction_device(mainchain,trunk->deal.device_index[0])],insert);
 							break;
 						}
 						flag=transaction_verify(mainchain,branch);
@@ -292,7 +305,7 @@ void transaction_recv(mainchain_t *mainchain)
 							*(uint32 *)insert->data=flag;
 							*(uint32 *)(insert->data+1*sizeof(uint32))=branch->deal.device_index[0];
 							*(uint32 *)(insert->data+2*sizeof(uint32))=branch->deal.token;
-							queue_insert(&g_device[branch->deal.device_index[0]],insert);
+							queue_insert(&g_device[transaction_device(mainchain,branch->deal.device_index[0])],insert);
 							break;
 						}
 						pow[0]=transaction_pow(trunk);
@@ -345,7 +358,7 @@ void transaction_recv(mainchain_t *mainchain)
 							*(uint32 *)insert->data=i ? STATUS_DST : STATUS_SRC;
 							*(uint32 *)(insert->data+1*sizeof(uint32))=trunk->deal.device_index[i];
 							*(uint32 *)(insert->data+2*sizeof(uint32))=trunk->deal.token;
-							queue_insert(&g_device[trunk->deal.device_index[i]],insert);
+							queue_insert(&g_device[transaction_device(mainchain,trunk->deal.device_index[i])],insert);
 						}
 					}
 					if (branch && branch->transaction!=TRANSACTION_DAG && trunk!=branch)
@@ -374,7 +387,7 @@ void transaction_recv(mainchain_t *mainchain)
 							*(uint32 *)insert->data=i ? STATUS_DST : STATUS_SRC;
 							*(uint32 *)(insert->data+1*sizeof(uint32))=branch->deal.device_index[i];
 							*(uint32 *)(insert->data+2*sizeof(uint32))=branch->deal.token;
-							queue_insert(&g_device[branch->deal.device_index[i]],insert);
+							queue_insert(&g_device[transaction_device(mainchain,branch->deal.device_index[i])],insert);
 						}
 					}
 					//add into dag if width enough
