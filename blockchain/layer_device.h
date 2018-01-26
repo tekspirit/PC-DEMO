@@ -16,6 +16,7 @@
 void connect_recv(device_t *device);
 void connect_seek(device_t *device);
 void connect_send(device_t *device);
+void connect_resend(device_t *device);
 uint8 transaction_verify(device_t *device,transaction_t *transaction);
 void transaction_recv(device_t *device);
 void transaction_signature(transaction_t *transaction,device_t *device);

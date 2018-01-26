@@ -34,7 +34,7 @@ void connect_recv(mainchain_t *mainchain)
 		flag=1;
 		//find latest/first queue
 		index.number=*(uint32 *)queue->data;
-		index.index=(uint32 *)(queue->data+1*sizeof(uint32));
+		index.device_index=(uint32 *)(queue->data+1*sizeof(uint32));
 		index.key=queue->data+(1+index.number)*sizeof(uint32);
 		index.token=(uint32 *)(queue->data+(1+index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN));
 		index.node=queue->data+(1+3*index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN);
@@ -42,11 +42,12 @@ void connect_recv(mainchain_t *mainchain)
 		for (i=0;i<index.number;i++)
 		{
 			for (j=0;j<mainchain->list_number;j++)
-				if (index.index[i]==mainchain->list[j].device_index)//must find it
+				if (index.device_index[i]==mainchain->list[j].device_index)//must find it
 					break;
 			mainchain->list[j].dag_index=mainchain->dag_number+1;
 			memcpy(&mainchain->list[j].key,&index.key[i*(KEY_E+KEY_LEN)],KEY_E+KEY_LEN);
 			mainchain->list[j].node=index.node[i];
+			//printf("connect(mainchain):%ld\r\n",index.device_index[i]);
 		}
 		//compute dag_number
 		mainchain->dag_number=0;
@@ -79,7 +80,7 @@ void connect_recv(mainchain_t *mainchain)
 		remove=queue;
 		while(remove)
 		{
-			if (remove->step==STEP_CONNECT && *(uint32 *)(remove->data+1*sizeof(uint32))==index.index[0])
+			if (remove->step==STEP_CONNECT && *(uint32 *)(remove->data+1*sizeof(uint32))==index.device_index[0])
 			{
 				if (remove==mainchain->queue)
 				{
@@ -225,7 +226,7 @@ uint32 transaction_pow(transaction_t *transaction)
 	return (uint32)i;
 }
 
-uint32 transaction_device(mainchain_t *mainchain,uint32 device_index)
+uint8 transaction_device(uint32 &index,mainchain_t *mainchain,uint32 device_index)
 {
 	uint32 i,j;
 
@@ -233,18 +234,24 @@ uint32 transaction_device(mainchain_t *mainchain,uint32 device_index)
 		if (device_index==mainchain->list[i].device_index)//must find it
 			break;
 	if (mainchain->list[i].node==NODE_HEAVY)//若本身为重节点,则取该节点
-		return mainchain->list[i].device_index;
+	{
+		index=mainchain->list[i].device_index;
+		return 0;
+	}
 	for (j=0;j<mainchain->list_number;j++)
-		if (mainchain->list[i].dag_index==mainchain->list[j].dag_index && mainchain->list[j].dag_index==NODE_HEAVY)//找到同一dag的重节点
+		if (mainchain->list[i].dag_index==mainchain->list[j].dag_index && mainchain->list[j].node==NODE_HEAVY)//寻找同一dag的重节点
 			break;
+	if (j==mainchain->list_number)//未找到
+		return 1;
+	index=mainchain->list[j].device_index;
 
-	return mainchain->list[j].device_index;
+	return 0;
 }
 
 void transaction_recv(mainchain_t *mainchain)
 {
 	//queue->dag
-	uint32 i;
+	uint32 i,j;
 	uint32 pow[2];
 	uint8 flag;
 	transaction_t *trunk,*branch,*transaction,*point;
@@ -280,6 +287,9 @@ void transaction_recv(mainchain_t *mainchain)
 					flag=transaction_seek(&trunk,&branch,mainchain);
 					if (!flag)//dag exist
 					{
+						i=transaction_device(j,mainchain,trunk->deal.device_index[0]);
+						if (i)//not find heavy node
+							goto loop;
 						flag=transaction_verify(mainchain,trunk);
 						if (flag)
 						{
@@ -291,9 +301,12 @@ void transaction_recv(mainchain_t *mainchain)
 							*(uint32 *)insert->data=flag;
 							*(uint32 *)(insert->data+1*sizeof(uint32))=trunk->deal.device_index[0];
 							*(uint32 *)(insert->data+2*sizeof(uint32))=trunk->deal.token;
-							queue_insert(&g_device[transaction_device(mainchain,trunk->deal.device_index[0])],insert);
+							queue_insert(&g_device[j],insert);
 							break;
 						}
+						i=transaction_device(j,mainchain,branch->deal.device_index[0]);
+						if (i)//not find heavy node
+							goto loop;
 						flag=transaction_verify(mainchain,branch);
 						if (flag)
 						{
@@ -305,7 +318,7 @@ void transaction_recv(mainchain_t *mainchain)
 							*(uint32 *)insert->data=flag;
 							*(uint32 *)(insert->data+1*sizeof(uint32))=branch->deal.device_index[0];
 							*(uint32 *)(insert->data+2*sizeof(uint32))=branch->deal.token;
-							queue_insert(&g_device[transaction_device(mainchain,branch->deal.device_index[0])],insert);
+							queue_insert(&g_device[j],insert);
 							break;
 						}
 						pow[0]=transaction_pow(trunk);
@@ -358,7 +371,11 @@ void transaction_recv(mainchain_t *mainchain)
 							*(uint32 *)insert->data=i ? STATUS_DST : STATUS_SRC;
 							*(uint32 *)(insert->data+1*sizeof(uint32))=trunk->deal.device_index[i];
 							*(uint32 *)(insert->data+2*sizeof(uint32))=trunk->deal.token;
-							queue_insert(&g_device[transaction_device(mainchain,trunk->deal.device_index[i])],insert);
+							flag=transaction_device(j,mainchain,trunk->deal.device_index[i]);
+							if (flag)//not find heavy node
+								queue_insert(mainchain,insert);
+							else
+								queue_insert(&g_device[j],insert);
 						}
 					}
 					if (branch && branch->transaction!=TRANSACTION_DAG && trunk!=branch)
@@ -387,7 +404,11 @@ void transaction_recv(mainchain_t *mainchain)
 							*(uint32 *)insert->data=i ? STATUS_DST : STATUS_SRC;
 							*(uint32 *)(insert->data+1*sizeof(uint32))=branch->deal.device_index[i];
 							*(uint32 *)(insert->data+2*sizeof(uint32))=branch->deal.token;
-							queue_insert(&g_device[transaction_device(mainchain,branch->deal.device_index[i])],insert);
+							flag=transaction_device(j,mainchain,branch->deal.device_index[i]);
+							if (flag)//not find heavy node
+								queue_insert(mainchain,insert);
+							else
+								queue_insert(&g_device[j],insert);
 						}
 					}
 					//add into dag if width enough
@@ -436,6 +457,7 @@ next:
 			}
 		}
 		else
+loop:
 		{
 			prev=queue;
 			queue=queue->next;
@@ -454,6 +476,64 @@ void transaction_send(mainchain_t *mainchain)
 	queue_insert(mainchain,queue);
 }
 
+//STEP_LEDGER
+void ledger_recv(mainchain_t *mainchain)
+{
+	//queue->device
+	uint32 i,j;
+	queue_t *queue,*insert,*prev;
+
+	queue=mainchain->queue;
+	while(queue)
+	{
+		if (queue->step==STEP_LEDGER)
+		{
+			//queue process
+			i=transaction_device(j,mainchain,*(uint32 *)(queue->data+1*sizeof(uint32)));
+			if (i)//not find heavy node
+			{
+				prev=queue;
+				queue=queue->next;
+				continue;
+			}
+			//queue send
+			insert=new queue_t;
+			insert->step=STEP_LEDGER;
+			insert->data=new uint8[sizeof(ledger_t)];
+			memcpy(insert,queue,sizeof(ledger_t));
+			queue_insert(&g_device[j],queue);
+			//queue delete
+			if (queue==mainchain->queue)
+			{
+				mainchain->queue=queue->next;
+				if (queue->data)
+				{
+					delete[] queue->data;
+					queue->data=NULL;
+				}
+				delete queue;
+				queue=mainchain->queue;
+			}
+			else
+			{
+				prev->next=queue->next;
+				if (queue->data)
+				{
+					delete[] queue->data;
+					queue->data=NULL;
+				}
+				delete queue;
+				queue=prev->next;
+			}
+		}
+		else
+		{
+			prev=queue;
+			queue=queue->next;
+		}
+	}
+}
+
 void process_mainchain(mainchain_t *mainchain)
 {
 	if (!mainchain->queue)
@@ -469,6 +549,10 @@ void process_mainchain(mainchain_t *mainchain)
 		transaction_recv(mainchain);//recv queue & process mainchain's
 		//send
 		transaction_send(mainchain);//pack & send mainchain's route->queue
+		break;
+	case STEP_LEDGER:
+		//recv
+		ledger_recv(mainchain);//recv queue & process mainchain's queue
 		break;
 	}
 }

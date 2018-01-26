@@ -6,8 +6,9 @@
 #include "crypt_sha256.h"
 //#include "crypt_hash.h"
 //define
-#define NODE_HEAVY 0
-#define NODE_LIGHT 1
+#define NODE_NONE 0
+#define NODE_HEAVY 1
+#define NODE_LIGHT 2
 
 #define STEP_CONNECT 0
 #define STEP_TRANSACTION 1
@@ -26,19 +27,17 @@
 #define STATUS_DONE 0 //验证通过
 #define STATUS_DEVICE 1 //地址验证错误
 #define STATUS_LEDGER 2 //账本验证错误
-#define STATUS_CONNECT 3 //未连接重节点
-#define STATUS_SRC 4 //源地址
-#define STATUS_DST 5 //目标地址
+#define STATUS_SRC 3 //源地址
+#define STATUS_DST 4 //目标地址
 
-//#define TIMER_CONNECT 1 //组网更新时间(重节点向服务器)
-
+#define TIMER_CONNECT 1 //组网更新时间(重节点->服务器)
 
 //typedef
 //struct
 struct index_t
 {
 	uint32 number;//待处理索引数目
-	uint32 *index;//待处理索引列表
+	uint32 *device_index;//待处理索引列表
 	uint8 *key;//待处理索引公钥
 	uint32 *token;//账户数额(0-可使用数额,1-冻结数额)
 	uint8 *node;//0-重节点,1-轻节点

@@ -8,6 +8,7 @@ extern deal_t *g_deal;//交易原子列表
 extern device_t *g_device;//设备数组
 extern mainchain_t g_mainchain;//主链
 extern volatile uint32 g_index;//临时用来统计交易号码的(以后会用hash_t代替,计数从1开始)
+extern volatile uint8 g_flag;//使用timer计时重发
 
 //STEP_CONNECT
 void connect_recv(device_t *device)
@@ -26,19 +27,19 @@ void connect_recv(device_t *device)
 		{
 			//queue process
 			index.number=*(uint32 *)queue->data;
-			index.index=(uint32 *)(queue->data+1*sizeof(uint32));
+			index.device_index=(uint32 *)(queue->data+1*sizeof(uint32));
 			index.key=queue->data+(1+index.number)*sizeof(uint32);
 			index.token=(uint32 *)(queue->data+(1+index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN));
 			index.node=queue->data+(1+3*index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN);
 			for (i=0;i<index.number;i++)
 			{
-				if (index.index[i]==device->device_index)
+				if (index.device_index[i]==device->device_index)
 					continue;
 				flag=0;
 				route=device->route;
 				while(route)
 				{
-					if (route->device_index==index.index[i])
+					if (route->device_index==index.device_index[i])
 					{
 						flag=1;
 						break;
@@ -49,13 +50,14 @@ void connect_recv(device_t *device)
 				{
 					route=new route_t;
 					route->flag=0;
-					route->device_index=index.index[i];
+					route->device_index=index.device_index[i];
 					memcpy(route->key.e,&index.key[i*(KEY_E+KEY_LEN)],KEY_E);
 					memcpy(route->key.n,&index.key[i*(KEY_E+KEY_LEN)+KEY_E],KEY_LEN);
 					memcpy(route->token,&index.token[2*i],2*sizeof(uint32));
 					route->node=index.node[i];
 					route->next=NULL;
 					route_insert(device,route);
+					//printf("connect(%ld):%ld\r\n",device->device_index,route->device_index);
 				}
 			}
 			//queue delete
@@ -125,6 +127,7 @@ void connect_seek(device_t *device)
 				route->node=g_device[i].node;
 				route->next=NULL;
 				route_insert(device,route);
+				//printf("connect(%ld):%ld\r\n",device->device_index,route->device_index);
 			}
 		}
 	}
@@ -154,12 +157,12 @@ void connect_send(device_t *device)
 	}
 	if (!flag)
 		return;
-	index.index=new uint32[index.number];
+	index.device_index=new uint32[index.number];
 	index.key=new uint8[index.number*(KEY_E+KEY_LEN)];
 	index.token=new uint32[2*index.number];
 	index.node=new uint8[index.number];
 	index.number=0;
-	index.index[index.number]=device->device_index;
+	index.device_index[index.number]=device->device_index;
 	memcpy(&index.key[index.number*(KEY_E+KEY_LEN)],device->rsa.e,KEY_E);
 	memcpy(&index.key[index.number*(KEY_E+KEY_LEN)+KEY_E],device->rsa.n,KEY_LEN);
 	memcpy(&index.token[2*index.number],device->token,2*sizeof(uint32));
@@ -168,7 +171,7 @@ void connect_send(device_t *device)
 	route=device->route;
 	while(route)
 	{
-		index.index[index.number]=route->device_index;
+		index.device_index[index.number]=route->device_index;
 		memcpy(&index.key[index.number*(KEY_E+KEY_LEN)],route->key.e,KEY_E);
 		memcpy(&index.key[index.number*(KEY_E+KEY_LEN)+KEY_E],route->key.n,KEY_LEN);
 		memcpy(&index.token[2*index.number],route->token,2*sizeof(uint32));
@@ -184,7 +187,7 @@ void connect_send(device_t *device)
 		queue->step=STEP_CONNECT;
 		queue->data=new uint8[(1+3*index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN)+index.number*sizeof(uint8)];
 		*(uint32 *)queue->data=index.number;//align problem?
-		memcpy(queue->data+1*sizeof(uint32),index.index,index.number*sizeof(uint32));
+		memcpy(queue->data+1*sizeof(uint32),index.device_index,index.number*sizeof(uint32));
 		memcpy(queue->data+(1+index.number)*sizeof(uint32),index.key,index.number*(KEY_E+KEY_LEN));
 		memcpy(queue->data+(1+index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN),index.token,2*index.number*sizeof(uint32));
 		memcpy(queue->data+(1+3*index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN),index.node,index.number*sizeof(uint8));
@@ -198,14 +201,74 @@ void connect_send(device_t *device)
 		queue->step=STEP_CONNECT;
 		queue->data=new uint8[(1+3*index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN)+index.number*sizeof(uint8)];
 		*(uint32 *)queue->data=index.number;//align problem?
-		memcpy(queue->data+1*sizeof(uint32),index.index,index.number*sizeof(uint32));
+		memcpy(queue->data+1*sizeof(uint32),index.device_index,index.number*sizeof(uint32));
 		memcpy(queue->data+(1+index.number)*sizeof(uint32),index.key,index.number*(KEY_E+KEY_LEN));
 		memcpy(queue->data+(1+index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN),index.token,2*index.number*sizeof(uint32));
 		memcpy(queue->data+(1+3*index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN),index.node,index.number*sizeof(uint8));
 		queue_insert(&g_mainchain,queue);
+		//printf("connect(%ld):mainchain\r\n",device->device_index);
 	}
 	//release
-	delete[] index.index;
+	delete[] index.device_index;
+	delete[] index.key;
+	//update queue
+	queue=new queue_t;
+	queue->step=STEP_TRANSACTION;
+	queue->data=NULL;
+	queue_insert(device,queue);
+}
+
+void connect_resend(device_t *device)
+{
+	//route->queue(device/mainchain)
+	route_t *route;
+	queue_t *queue;
+	index_t index;
+
+	if (device->node==NODE_LIGHT)
+		return;
+	//compute number(should handling)
+	index.number=1;
+	route=device->route;
+	while(route)
+	{
+		index.number++;
+		route=route->next;
+	}
+	index.device_index=new uint32[index.number];
+	index.key=new uint8[index.number*(KEY_E+KEY_LEN)];
+	index.token=new uint32[2*index.number];
+	index.node=new uint8[index.number];
+	index.number=0;
+	index.device_index[index.number]=device->device_index;
+	memcpy(&index.key[index.number*(KEY_E+KEY_LEN)],device->rsa.e,KEY_E);
+	memcpy(&index.key[index.number*(KEY_E+KEY_LEN)+KEY_E],device->rsa.n,KEY_LEN);
+	memcpy(&index.token[2*index.number],device->token,2*sizeof(uint32));
+	index.node[index.number]=device->node;
+	index.number++;
+	route=device->route;
+	while(route)
+	{
+		index.device_index[index.number]=route->device_index;
+		memcpy(&index.key[index.number*(KEY_E+KEY_LEN)],route->key.e,KEY_E);
+		memcpy(&index.key[index.number*(KEY_E+KEY_LEN)+KEY_E],route->key.n,KEY_LEN);
+		memcpy(&index.token[2*index.number],route->token,2*sizeof(uint32));
+		index.node[index.number]=route->node;
+		index.number++;
+		route=route->next;
+	}
+	//fill mainchain
+	queue=new queue_t;
+	queue->step=STEP_CONNECT;
+	queue->data=new uint8[(1+3*index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN)+index.number*sizeof(uint8)];
+	*(uint32 *)queue->data=index.number;//align problem?
+	memcpy(queue->data+1*sizeof(uint32),index.device_index,index.number*sizeof(uint32));
+	memcpy(queue->data+(1+index.number)*sizeof(uint32),index.key,index.number*(KEY_E+KEY_LEN));
+	memcpy(queue->data+(1+index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN),index.token,2*index.number*sizeof(uint32));
+	memcpy(queue->data+(1+3*index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN),index.node,index.number*sizeof(uint8));
+	queue_insert(&g_mainchain,queue);
+	//release
+	delete[] index.device_index;
 	delete[] index.key;
 	//update queue
 	queue=new queue_t;
@@ -413,6 +476,12 @@ void transaction_send(device_t *device,transaction_t *transaction)
 	}
 	if (device->node==NODE_LIGHT)
 	{
+		//update queue
+		queue=new queue_t;
+		queue->step=STEP_TRANSACTION;
+		queue->data=NULL;
+		queue_insert(device,queue);
+		//update ledger
 		route=device->route;
 		while(route)
 		{
@@ -422,15 +491,9 @@ void transaction_send(device_t *device,transaction_t *transaction)
 		}
 		if (!route)//尚未连接重节点,更新自己账本
 		{
-			//update ledger
 			device->token[0]-=transaction->deal.token;
 			device->token[1]+=transaction->deal.token;
 			printf("device(%ld):%ld-%ld\r\n",device->device_index,device->token[0],device->token[1]);
-			//update queue
-			queue=new queue_t;
-			queue->step=STEP_TRANSACTION;
-			queue->data=NULL;
-			queue_insert(device,queue);
 			return;
 		}
 	}
@@ -486,7 +549,8 @@ void ledger_recv(device_t *device)
 					case STATUS_DST:
 						device->token[0]+=*(uint32 *)(queue->data+2*sizeof(uint32));
 						break;
-					default:
+					case STATUS_DEVICE:
+					case STATUS_LEDGER:
 						device->token[0]+=*(uint32 *)(queue->data+2*sizeof(uint32));
 						device->token[1]-=*(uint32 *)(queue->data+2*sizeof(uint32));
 						break;
@@ -504,7 +568,8 @@ void ledger_recv(device_t *device)
 				case STATUS_DST:
 					device->token[0]+=*(uint32 *)(queue->data+2*sizeof(uint32));
 					break;
-				default:
+				case STATUS_DEVICE:
+				case STATUS_LEDGER:
 					device->token[0]+=*(uint32 *)(queue->data+2*sizeof(uint32));
 					device->token[1]-=*(uint32 *)(queue->data+2*sizeof(uint32));
 					break;
@@ -583,9 +648,15 @@ void move_location(device_t *device)
 void process_device(device_t *device)
 {
 	transaction_t *transaction;
+	static __declspec(thread) uint8 flag=0;
 
 	if (!device->queue)
 		return;
+	if (flag!=g_flag)
+	{
+		flag=g_flag;
+		connect_resend(device);//resend connect device->mainchain
+	}
 	switch(device->queue->step)
 	{
 	case STEP_CONNECT:
@@ -598,8 +669,6 @@ void process_device(device_t *device)
 		break;
 	case STEP_TRANSACTION:
 		//recv
-		if (((uint32)device & 0xff000000)!=0x02000000)
-			device=device;
 		transaction_recv(device);//recv & process device's queue
 		//process
 		transaction=transaction_generate(device);//generate transaction

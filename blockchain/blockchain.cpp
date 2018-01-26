@@ -10,6 +10,7 @@ CRITICAL_SECTION g_cs;
 device_t *g_device;//设备数组
 mainchain_t g_mainchain;//主链
 volatile uint32 g_index;//临时用来统计交易号码的(以后会用hash_t代替,计数从1开始)
+volatile uint8 g_flag;//使用timer计时重发
 CString g_string[9]={"none","device_connect","mainchain_connect","device_transaction","mainchain_transaction","device_walk","dag_tangle"};
 
 //主链线程
@@ -35,7 +36,6 @@ uint32 WINAPI thread_device(PVOID pParam)
 	device_t *device;
 
 	device=(device_t *)pParam;
-	//SetTimer(NULL,device->device_index,TIMER_CONNECT*1000,NULL);
 	while(1)
 	{
 		EnterCriticalSection(&g_cs);
@@ -55,6 +55,7 @@ void main(int argc,char* argv[])
 	uint32 token;//初始化资金
 	//
 	uint32 i;
+	MSG msg;
 	//uint8 flag;
 	int8 buf[1000],*point[2];
 	FILE *file;
@@ -126,6 +127,7 @@ void main(int argc,char* argv[])
 	InitializeCriticalSection(&g_cs);
 	srand((unsigned)time(NULL));
 	g_index=0;
+	g_flag=0;
 	g_device=new device_t[g_devicenum[0]+g_devicenum[1]];
 	for (i=0;i<g_devicenum[0]+g_devicenum[1];i++)
 	{
@@ -183,6 +185,7 @@ void main(int argc,char* argv[])
 	{
 		g_mainchain.list[i].device_index=i;
 		g_mainchain.list[i].token=token;
+		g_mainchain.list[i].node=NODE_NONE;
 	}
 	g_mainchain.dag=NULL;
 	thread_handle=CreateThread(NULL,0,thread_mainchain,(PVOID)&g_mainchain,0,&thread_id);
@@ -191,11 +194,14 @@ void main(int argc,char* argv[])
 		printf("initial thread_mainchain failed\r\n");
 		return;
 	}
+	SetTimer(NULL,1,TIMER_CONNECT*1000,NULL);//原则上时钟线程应该是每个设备线程配备一个,这里简化为共用一个
 	//msg loop
 	while(1)
 	{
+		GetMessage(&msg,NULL,0,0);
 #if 1
 		EnterCriticalSection(&g_cs);
+		g_flag=!g_flag;
 		/*
 		flag=0;
 		if (g_mainchain.queue && g_mainchain.queue->step==STEP_CONNECT)
