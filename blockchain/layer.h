@@ -163,7 +163,8 @@ struct device_t
 //function
 void route_insert(device_t *device,route_t *route);
 void route_delete(device_t *device);
-uint8 route_find(device_t *device,uint32 device_index);
+uint8 route_node(device_t *device,uint32 device_index);
+route_t *route_find(device_t *device,uint32 device_index);
 void queue_insert(device_t *device,queue_t *queue);
 void queue_insert(mainchain_t *mainchain,queue_t *queue);
 void queue_delete(device_t *device);

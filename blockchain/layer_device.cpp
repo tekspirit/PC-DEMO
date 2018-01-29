@@ -57,7 +57,7 @@ void connect_recv(device_t *device)
 					route->node=index.node[i];
 					route->next=NULL;
 					route_insert(device,route);
-					//printf("connect(%ld):%ld\r\n",device->device_index,route->device_index);
+					printf("connect(%ld):%ld\r\n",device->device_index,route->device_index);
 				}
 			}
 			//queue delete
@@ -127,7 +127,7 @@ void connect_seek(device_t *device)
 				route->node=g_device[i].node;
 				route->next=NULL;
 				route_insert(device,route);
-				//printf("connect(%ld):%ld\r\n",device->device_index,route->device_index);
+				printf("connect(%ld):%ld\r\n",device->device_index,route->device_index);
 			}
 		}
 	}
@@ -206,7 +206,7 @@ void connect_send(device_t *device)
 		memcpy(queue->data+(1+index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN),index.token,2*index.number*sizeof(uint32));
 		memcpy(queue->data+(1+3*index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN),index.node,index.number*sizeof(uint8));
 		queue_insert(&g_mainchain,queue);
-		//printf("connect(%ld):mainchain\r\n",device->device_index);
+		printf("connect(%ld):mainchain\r\n",device->device_index);
 	}
 	//release
 	delete[] index.device_index;
@@ -267,6 +267,7 @@ void connect_resend(device_t *device)
 	memcpy(queue->data+(1+index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN),index.token,2*index.number*sizeof(uint32));
 	memcpy(queue->data+(1+3*index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN),index.node,index.number*sizeof(uint8));
 	queue_insert(&g_mainchain,queue);
+	//printf("connect(%ld):mainchain\r\n",device->device_index);
 	//release
 	delete[] index.device_index;
 	delete[] index.key;
@@ -332,6 +333,7 @@ void transaction_recv(device_t *device)
 {
 	//queue->delete queue
 	uint8 flag,node;
+	route_t *route;
 	queue_t *queue,*prev,*insert;
 	transaction_t transaction;
 
@@ -349,7 +351,7 @@ void transaction_recv(device_t *device)
 				memcpy(transaction.plain,queue->data+1*sizeof(uint32)+sizeof(deal_t),KEY_LEN);
 				memcpy(transaction.cipher,queue->data+1*sizeof(uint32)+sizeof(deal_t)+KEY_LEN,KEY_LEN);
 				flag=transaction_verify(device,&transaction);
-				node=route_find(device,transaction.deal.device_index[0]);
+				node=route_node(device,transaction.deal.device_index[0]);
 				if (flag)//error
 				{
 					if (node==NODE_LIGHT)//源为轻节点,则传回轻节点去更新
@@ -380,11 +382,12 @@ void transaction_recv(device_t *device)
 					memcpy(insert->data+1*sizeof(uint32)+sizeof(deal_t)+KEY_LEN,queue->data+1*sizeof(uint32)+sizeof(deal_t)+KEY_LEN,KEY_LEN);
 					queue_insert(&g_mainchain,insert);
 					//update token
-					if (node==NODE_LIGHT)//源为轻节点,则更新当前重节点token
+					if (node==NODE_LIGHT)//源为轻节点,则更新当前重节点的route token
 					{
-						device->token[0]-=transaction.deal.token;
-						device->token[1]+=transaction.deal.token;
-						printf("device(%ld):%ld-%ld\r\n",device->device_index,device->token[0],device->token[1]);
+						route=route_find(device,transaction.deal.device_index[0]);
+						route->token[0]-=transaction.deal.token;
+						route->token[1]+=transaction.deal.token;
+						//printf("device(%ld):%ld-%ld\r\n",device->device_index,device->token[0],device->token[1]);
 					}
 				}
 			}
@@ -530,13 +533,13 @@ void ledger_recv(device_t *device)
 			//queue process
 			if (device->node==NODE_HEAVY)//若是重节点
 			{
-				node=route_find(device,*(uint32 *)(queue->data+1*sizeof(uint32)));
+				node=route_node(device,*(uint32 *)(queue->data+1*sizeof(uint32)));
 				if (node==NODE_LIGHT)//目标节点为轻节点,则传递至轻节点更新
 				{
 					insert=new queue_t;
 					insert->step=STEP_LEDGER;
 					insert->data=new uint8[sizeof(ledger_t)];
-					memcpy(insert,queue,sizeof(ledger_t));
+					memcpy(insert->data,queue->data,sizeof(ledger_t));
 					queue_insert(&g_device[*(uint32 *)(queue->data+1*sizeof(uint32))],insert);
 				}
 				else//若为重节点,update ledger

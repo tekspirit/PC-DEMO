@@ -500,7 +500,7 @@ void ledger_recv(mainchain_t *mainchain)
 			insert=new queue_t;
 			insert->step=STEP_LEDGER;
 			insert->data=new uint8[sizeof(ledger_t)];
-			memcpy(insert,queue,sizeof(ledger_t));
+			memcpy(insert->data,queue->data,sizeof(ledger_t));
 			queue_insert(&g_device[j],queue);
 			//queue delete
 			if (queue==mainchain->queue)

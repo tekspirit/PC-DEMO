@@ -18,7 +18,7 @@ void route_delete(device_t *device)
 }
 
 //route find node by device_index
-uint8 route_find(device_t *device,uint32 device_index)
+uint8 route_node(device_t *device,uint32 device_index)
 {
 	route_t *route;
 
@@ -33,6 +33,22 @@ uint8 route_find(device_t *device,uint32 device_index)
 	}
 
 	return route->node;
+}
+
+//route find by device_index
+route_t *route_find(device_t *device,uint32 device_index)
+{
+	route_t *route;
+
+	route=device->route;
+	while(route)
+	{
+		if (route->device_index==device_index)
+			break;
+		route=route->next;
+	}
+	
+	return route;
 }
 
 //queue insert into device->queue
