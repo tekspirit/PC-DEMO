@@ -57,7 +57,7 @@ void connect_recv(device_t *device)
 					route->node=index.node[i];
 					route->next=NULL;
 					route_insert(device,route);
-					printf("connect(%ld):%ld\r\n",device->device_index,route->device_index);
+					//printf("connect(%ld):%ld\r\n",device->device_index,route->device_index);
 				}
 			}
 			//queue delete
@@ -127,7 +127,7 @@ void connect_seek(device_t *device)
 				route->node=g_device[i].node;
 				route->next=NULL;
 				route_insert(device,route);
-				printf("connect(%ld):%ld\r\n",device->device_index,route->device_index);
+				//printf("connect(%ld):%ld\r\n",device->device_index,route->device_index);
 			}
 		}
 	}
@@ -206,7 +206,7 @@ void connect_send(device_t *device)
 		memcpy(queue->data+(1+index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN),index.token,2*index.number*sizeof(uint32));
 		memcpy(queue->data+(1+3*index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN),index.node,index.number*sizeof(uint8));
 		queue_insert(&g_mainchain,queue);
-		printf("connect(%ld):mainchain\r\n",device->device_index);
+		//printf("connect(%ld):mainchain\r\n",device->device_index);
 	}
 	//release
 	delete[] index.device_index;
@@ -617,35 +617,12 @@ void ledger_send(device_t *device)
 	queue_t *queue;
 
 	queue=new queue_t;
-	//queue->step=STEP_MOVE;
-	queue->step=STEP_TRANSACTION;
-	queue->data=NULL;
+	queue->step=STEP_CONNECT;
+	queue->data=new uint8[1*sizeof(uint32)];
+	*(uint32 *)queue->data=0;//align problem?
+	//queue->step=STEP_MOVE;//STEP_TRANSACTION
+	//queue->data=NULL;
 	queue_insert(device,queue);
-}
-
-//STEP_MOVE
-void move_location(device_t *device)
-{
-	if (rand()%2)
-	{
-		device->x+=g_devicestep;
-		device->x=math_min(device->x,g_devicerange-1);
-	}
-	else
-	{
-		device->x-=g_devicestep;
-		device->x=math_max(device->x,(uint32)0);
-	}
-	if (rand()%2)
-	{
-		device->y+=g_devicestep;
-		device->y=math_min(device->y,g_devicerange-1);
-	}
-	else
-	{
-		device->y-=g_devicestep;
-		device->y=math_max(device->y,(uint32)0);
-	}
 }
 
 void process_device(device_t *device)
@@ -685,7 +662,7 @@ void process_device(device_t *device)
 		//send
 		ledger_send(device);//pack & send device's route->queue
 		break;
-	case STEP_MOVE:
-		break;
+	//case STEP_MOVE:
+	//	break;
 	}
 }

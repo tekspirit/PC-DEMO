@@ -272,3 +272,28 @@ void key_generate(device_t *device)
 			break;
 	}
 }
+
+//STEP_MOVE
+void move_location(device_t *device,uint32 step,uint32 range)
+{
+	if (rand()%2)
+	{
+		device->x+=step;
+		device->x=math_min(device->x,range-1);
+	}
+	else
+	{
+		device->x-=step;
+		device->x=math_max(device->x,(uint32)0);
+	}
+	if (rand()%2)
+	{
+		device->y+=step;
+		device->y=math_min(device->y,range-1);
+	}
+	else
+	{
+		device->y-=step;
+		device->y=math_max(device->y,(uint32)0);
+	}
+}

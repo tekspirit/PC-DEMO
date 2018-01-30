@@ -202,6 +202,8 @@ void main(int argc,char* argv[])
 #if 1
 		EnterCriticalSection(&g_cs);
 		g_flag=!g_flag;
+		for (i=0;i<g_devicenum[0]+g_devicenum[1];i++)
+			move_location(&g_device[i],g_devicestep,g_devicerange);
 		/*
 		flag=0;
 		if (g_mainchain.queue && g_mainchain.queue->step==STEP_CONNECT)
