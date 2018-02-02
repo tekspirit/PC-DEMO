@@ -20,13 +20,8 @@ IMPLEMENT_DYNCREATE(CBlockchainMfcView, CView)
 
 BEGIN_MESSAGE_MAP(CBlockchainMfcView, CView)
 	//{{AFX_MSG_MAP(CBlockchainMfcView)
-		// NOTE - the ClassWizard will add and remove mapping macros here.
-		//    DO NOT EDIT what you see in these blocks of generated code!
 	//}}AFX_MSG_MAP
 	// Standard printing commands
-	ON_COMMAND(ID_FILE_PRINT, CView::OnFilePrint)
-	ON_COMMAND(ID_FILE_PRINT_DIRECT, CView::OnFilePrint)
-	ON_COMMAND(ID_FILE_PRINT_PREVIEW, CView::OnFilePrintPreview)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -56,25 +51,6 @@ void CBlockchainMfcView::OnDraw(CDC* pDC)
 	CBlockchainMfcDoc* pDoc = GetDocument();
 	ASSERT_VALID(pDoc);
 	// TODO: add draw code for native data here
-}
-
-/////////////////////////////////////////////////////////////////////////////
-// CBlockchainMfcView printing
-
-BOOL CBlockchainMfcView::OnPreparePrinting(CPrintInfo* pInfo)
-{
-	// default preparation
-	return DoPreparePrinting(pInfo);
-}
-
-void CBlockchainMfcView::OnBeginPrinting(CDC* /*pDC*/, CPrintInfo* /*pInfo*/)
-{
-	// TODO: add extra initialization before printing
-}
-
-void CBlockchainMfcView::OnEndPrinting(CDC* /*pDC*/, CPrintInfo* /*pInfo*/)
-{
-	// TODO: add cleanup after printing
 }
 
 /////////////////////////////////////////////////////////////////////////////

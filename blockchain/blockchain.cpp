@@ -241,9 +241,10 @@ void main(int argc,char* argv[])
 #endif
 	}
 	//release
-	//for (i=0;i<g_devicenum[0]+g_devicenum[1];i++)
-	//	device_release(&g_device[i]);
-	//delete[] g_device;
 	delete[] g_deal;
+	for (i=0;i<g_devicenum[0]+g_devicenum[1];i++)
+		device_delete(&g_device[i]);
+	delete[] g_device;
+	mainchain_delete(&g_mainchain);
 	DeleteCriticalSection(&g_cs);
 }

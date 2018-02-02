@@ -6,13 +6,18 @@
 --------------------Configuration: BlockchainMfc - Win32 Debug--------------------
 </h3>
 <h3>Command Lines</h3>
-Creating temporary file "C:\Users\chenm\AppData\Local\Temp\RSPC6DF.tmp" with contents
+Creating temporary file "C:\Users\chenm\AppData\Local\Temp\RSP5380.tmp" with contents
 [
 /nologo /MDd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_AFXDLL" /D "_MBCS" /FR"Debug/" /Fp"Debug/BlockchainMfc.pch" /Yu"stdafx.h" /Fo"Debug/" /Fd"Debug/" /FD /GZ /c 
 "C:\zhuo\github\blockchain\BlockchainMfc\CommandView.cpp"
+"C:\zhuo\github\blockchain\BlockchainMfc\ConnectView.cpp"
+"C:\zhuo\github\blockchain\BlockchainMfc\layer.cpp"
+"C:\zhuo\github\blockchain\BlockchainMfc\layer_device.cpp"
+"C:\zhuo\github\blockchain\BlockchainMfc\layer_mainchain.cpp"
+"C:\zhuo\github\blockchain\BlockchainMfc\MainFrm.cpp"
 ]
-Creating command line "cl.exe @C:\Users\chenm\AppData\Local\Temp\RSPC6DF.tmp" 
-Creating temporary file "C:\Users\chenm\AppData\Local\Temp\RSPC6E0.tmp" with contents
+Creating command line "cl.exe @C:\Users\chenm\AppData\Local\Temp\RSP5380.tmp" 
+Creating temporary file "C:\Users\chenm\AppData\Local\Temp\RSP5381.tmp" with contents
 [
 /nologo /subsystem:windows /incremental:yes /pdb:"Debug/BlockchainMfc.pdb" /debug /machine:I386 /out:"Debug/BlockchainMfc.exe" /pdbtype:sept 
 .\Debug\BlockchainMfc.obj
@@ -32,12 +37,29 @@ Creating temporary file "C:\Users\chenm\AppData\Local\Temp\RSPC6E0.tmp" with con
 .\Debug\TransactionView.obj
 .\Debug\BlockchainMfc.res
 ]
-Creating command line "link.exe @C:\Users\chenm\AppData\Local\Temp\RSPC6E0.tmp"
+Creating command line "link.exe @C:\Users\chenm\AppData\Local\Temp\RSP5381.tmp"
 <h3>Output Window</h3>
 Compiling...
 CommandView.cpp
-Linking...
-Creating temporary file "C:\Users\chenm\AppData\Local\Temp\RSPC8A6.tmp" with contents
+C:\zhuo\github\blockchain\BlockchainMfc\CommandView.cpp(256) : error C2065: 'device_delete' : undeclared identifier
+C:\zhuo\github\blockchain\BlockchainMfc\CommandView.cpp(258) : error C2065: 'mainchain_delete' : undeclared identifier
+layer.cpp
+C:\zhuo\github\blockchain\BlockchainMfc\layer.cpp(258) : warning C4101: 'route' : unreferenced local variable
+C:\zhuo\github\blockchain\BlockchainMfc\layer.cpp(276) : error C2011: 'mainchain_t' : 'struct' type redefinition
+C:\zhuo\github\blockchain\BlockchainMfc\layer.cpp(287) : error C2011: 'transaction_t' : 'struct' type redefinition
+Generating Code...
+Compiling...
+ConnectView.cpp
+Generating Code...
+Compiling...
+layer_device.cpp
+layer_mainchain.cpp
+MainFrm.cpp
+C:\zhuo\github\blockchain\BlockchainMfc\MainFrm.cpp(194) : error C2039: 'dag' : is not a member of 'device_t'
+        c:\zhuo\github\blockchain\blockchainmfc\layer.h(121) : see declaration of 'device_t'
+Generating Code...
+Error executing cl.exe.
+Creating temporary file "C:\Users\chenm\AppData\Local\Temp\RSP570C.tmp" with contents
 [
 /nologo /o"Debug/BlockchainMfc.bsc" 
 .\Debug\StdAfx.sbr
@@ -55,14 +77,14 @@ Creating temporary file "C:\Users\chenm\AppData\Local\Temp\RSPC8A6.tmp" with con
 .\Debug\layer_mainchain.sbr
 .\Debug\MainFrm.sbr
 .\Debug\TransactionView.sbr]
-Creating command line "bscmake.exe @C:\Users\chenm\AppData\Local\Temp\RSPC8A6.tmp"
+Creating command line "bscmake.exe @C:\Users\chenm\AppData\Local\Temp\RSP570C.tmp"
 Creating browse info file...
 <h3>Output Window</h3>
 
 
 
 <h3>Results</h3>
-BlockchainMfc.exe - 0 error(s), 0 warning(s)
+BlockchainMfc.exe - 5 error(s), 1 warning(s)
 </pre>
 </body>
 </html>

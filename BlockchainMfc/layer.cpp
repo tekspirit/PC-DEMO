@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "layer.h"
 
+extern volatile uint8 g_run;//0-停止,1-运行
+
 //route insert into device->route
 void route_insert(device_t *device,route_t *route)
 {
@@ -14,8 +16,12 @@ void route_delete(device_t *device)
 	route_t *route;
 
 	route=device->route;
-	device->route=route->next;
-	delete route;
+	while(route)
+	{
+		device->route=route->next;
+		delete route;
+		route=device->route;
+	}
 }
 
 //route find node by device_index
@@ -106,19 +112,23 @@ void queue_insert(mainchain_t *mainchain,queue_t *queue)
 	}
 }
 
-//queue delete from device->queue
-void queue_delete(device_t *device)
+//queue delete from device/mainchain->queue
+void queue_delete(queue_t *queue)
 {
-	queue_t *queue;
+	queue_t *point;
 
-	queue=device->queue;
-	device->queue=queue->next;
-	if (queue->data)
+	point=queue;
+	while(point)
 	{
-		delete[] queue->data;
-		queue->data=NULL;
+		queue=point->next;
+		if (point->data)
+		{
+			delete[] point->data;
+			point->data=NULL;
+		}
+		delete point;
+		point=queue;
 	}
-	delete queue;
 }
 
 //list delete from mainchain->list
@@ -155,6 +165,26 @@ void dag_delete(mainchain_t *mainchain,transaction_t *transaction)
 		prev=point;
 		point=point->next;
 	}
+}
+
+//dag delete:删除整个dag
+void dag_delete(mainchain_t *mainchain)
+{
+	transaction_t *transaction,*trunk,*branch;
+
+	//dag
+	transaction=mainchain->dag;
+	while(transaction)
+	{
+		trunk=transaction->trunk;
+		branch=transaction->branch;
+
+		transaction=transaction->next;
+	}
+	//tip
+
+
+
 }
 
 //dag clear:清除dag中的flag
@@ -224,6 +254,23 @@ uint32 dag_num(transaction_t *dag)
 	return number;
 }
 
+//dag nontip point:计算dag中的nontip数
+uint32 dag_dagpoint(transaction_t *transaction)
+{
+	if (transaction->flag)
+		return 0;
+	transaction->flag=1;
+
+	if (transaction->trunk && transaction->branch)
+		return dag_dagpoint(transaction->trunk)+dag_dagpoint(transaction->branch);
+	if (transaction->trunk)
+		return dag_dagpoint(transaction->trunk)+1;
+	if (transaction->branch)
+		return dag_dagpoint(transaction->branch)+1;
+
+	return 1;
+}
+
 //dag tip:动态调整tip个数(初始构造、动态运行时调整宽度)
 uint32 dag_tip(void)
 {
@@ -240,6 +287,66 @@ uint32 dag_height(transaction_t *dag,transaction_t *transaction)
 uint32 dag_depth(transaction_t *dag,transaction_t *transaction)
 {
 	return 0;
+}
+
+//device delete
+void device_delete(device_t *device)
+{
+	route_t *route;
+
+	//route
+	route_delete(device);
+	//queue
+	queue_delete(device->queue);
+	//rsa
+	delete[] device->rsa.e;
+	delete[] device->rsa.n;
+	delete[] device->rsa.p;
+	delete[] device->rsa.q;
+	delete[] device->rsa.d;
+	delete[] device->rsa.dp;
+	delete[] device->rsa.dq;
+	delete[] device->rsa.qp;
+}
+
+struct mainchain_t
+{
+	queue_t *queue;//消息队列
+	uint32 list_number;//节点数目
+	uint32 dag_number;//区域数目
+	list_t *list;//节点属性列表
+	transaction_t *dag;//账本dag链表(全局账本)
+};
+
+
+
+struct transaction_t
+{
+	uint32 index;//交易索引
+	deal_t deal;//交易原子
+	uint8 plain[KEY_LEN];//明文验证
+	uint8 cipher[KEY_LEN];//密文验证
+	uint32 pow[2];//按计算规则得到的前序trunk/branch的pow值
+	//
+	uint8 transaction;//交易状态.0-tip,1-dag
+	uint8 flag;//dag:0-未计算,1-已计算.tip:0-正确,1-错误
+	uint16 reserved;
+	//uint8 type;//交易类型.0-普通信息,1-有价信息
+	//
+	transaction_t *trunk;//主交易节点
+	transaction_t *branch;//从交易节点
+	transaction_t *next;//tip链表使用
+};
+
+//mainchain delete
+void mainchain_delete(mainchain_t *mainchain)
+{
+	//queue
+	queue_delete(mainchain->queue);
+	//list
+	delete[] mainchain->list;
+	//dag
+
 }
 
 //generate device->rsa
@@ -274,7 +381,7 @@ void key_generate(device_t *device)
 	}
 }
 
-//STEP_MOVE
+//move device
 void move_location(device_t *device,uint32 step,uint32 range)
 {
 	if (rand()%2)
@@ -297,4 +404,10 @@ void move_location(device_t *device,uint32 step,uint32 range)
 		device->y-=step;
 		device->y=math_max(device->y,(uint32)0);
 	}
+}
+
+void delay(void)
+{
+	while(!g_run);
+	Sleep(500);
 }

@@ -9,6 +9,8 @@ extern deal_t *g_deal;//交易原子列表
 extern device_t *g_device;//设备数组
 extern mainchain_t g_mainchain;//主链
 extern volatile uint32 g_index;//临时用来统计交易号码的(以后会用hash_t代替,计数从1开始)
+//
+extern uint8 **g_check;//[g_number][5].0-source,1-mc(src),2-mc(dst),3-node(src),4-node(dst)
 
 //STEP_CONNECT
 void connect_recv(mainchain_t *mainchain)
@@ -300,9 +302,12 @@ void transaction_recv(mainchain_t *mainchain)
 							insert->step=STEP_LEDGER;
 							insert->data=new uint8[sizeof(ledger_t)];
 							*(uint32 *)insert->data=flag;
-							*(uint32 *)(insert->data+1*sizeof(uint32))=trunk->deal.device_index[0];
-							*(uint32 *)(insert->data+2*sizeof(uint32))=trunk->deal.token;
+							*(uint32 *)(insert->data+1*sizeof(uint32))=trunk->index;
+							*(uint32 *)(insert->data+2*sizeof(uint32))=trunk->deal.device_index[0];
+							*(uint32 *)(insert->data+3*sizeof(uint32))=trunk->deal.token;
 							queue_insert(&g_device[j],insert);
+							//printf("mainchain:%ld\r\n",trunk->deal.device_index[0]);
+							delay();
 							break;
 						}
 						i=transaction_device(j,mainchain,branch->deal.device_index[0]);
@@ -317,9 +322,12 @@ void transaction_recv(mainchain_t *mainchain)
 							insert->step=STEP_LEDGER;
 							insert->data=new uint8[sizeof(ledger_t)];
 							*(uint32 *)insert->data=flag;
-							*(uint32 *)(insert->data+1*sizeof(uint32))=branch->deal.device_index[0];
-							*(uint32 *)(insert->data+2*sizeof(uint32))=branch->deal.token;
+							*(uint32 *)(insert->data+1*sizeof(uint32))=branch->index;
+							*(uint32 *)(insert->data+2*sizeof(uint32))=branch->deal.device_index[0];
+							*(uint32 *)(insert->data+3*sizeof(uint32))=branch->deal.token;
 							queue_insert(&g_device[j],insert);
+							//printf("mainchain:%ld\r\n",branch->deal.device_index[0]);
+							delay();
 							break;
 						}
 						pow[0]=transaction_pow(trunk);
@@ -355,12 +363,12 @@ void transaction_recv(mainchain_t *mainchain)
 							if (trunk->deal.device_index[0]==mainchain->list[i].device_index)
 							{
 								mainchain->list[i].token-=trunk->deal.token;
-								printf("mainchain(%ld-%ld):%ld\r\n",mainchain->list[i].dag_index,mainchain->list[i].device_index,mainchain->list[i].token);
+								//printf("mainchain(%ld-%ld):%ld\r\n",mainchain->list[i].dag_index,mainchain->list[i].device_index,mainchain->list[i].token);
 							}
 							if (trunk->deal.device_index[1]==mainchain->list[i].device_index)
 							{
 								mainchain->list[i].token+=trunk->deal.token;
-								printf("mainchain(%ld-%ld):%ld\r\n",mainchain->list[i].dag_index,mainchain->list[i].device_index,mainchain->list[i].token);
+								//printf("mainchain(%ld-%ld):%ld\r\n",mainchain->list[i].dag_index,mainchain->list[i].device_index,mainchain->list[i].token);
 							}
 						}
 						//notify device
@@ -370,13 +378,18 @@ void transaction_recv(mainchain_t *mainchain)
 							insert->step=STEP_LEDGER;
 							insert->data=new uint8[sizeof(ledger_t)];
 							*(uint32 *)insert->data=i ? STATUS_DST : STATUS_SRC;
-							*(uint32 *)(insert->data+1*sizeof(uint32))=trunk->deal.device_index[i];
-							*(uint32 *)(insert->data+2*sizeof(uint32))=trunk->deal.token;
+							*(uint32 *)(insert->data+1*sizeof(uint32))=trunk->index;
+							*(uint32 *)(insert->data+2*sizeof(uint32))=trunk->deal.device_index[i];
+							*(uint32 *)(insert->data+3*sizeof(uint32))=trunk->deal.token;
 							flag=transaction_device(j,mainchain,trunk->deal.device_index[i]);
 							if (flag)//not find heavy node
 								queue_insert(mainchain,insert);
 							else
+							{
 								queue_insert(&g_device[j],insert);
+								//printf("mainchain:%ld\r\n",j);
+								g_check[trunk->index-1][1+i]=1;delay();
+							}
 						}
 					}
 					if (branch && branch->transaction!=TRANSACTION_DAG && trunk!=branch)
@@ -388,12 +401,12 @@ void transaction_recv(mainchain_t *mainchain)
 							if (branch->deal.device_index[0]==mainchain->list[i].device_index)
 							{
 								mainchain->list[i].token-=branch->deal.token;
-								printf("mainchain(%ld-%ld):%ld\r\n",mainchain->list[i].dag_index,mainchain->list[i].device_index,mainchain->list[i].token);
+								//printf("mainchain(%ld-%ld):%ld\r\n",mainchain->list[i].dag_index,mainchain->list[i].device_index,mainchain->list[i].token);
 							}
 							if (branch->deal.device_index[1]==mainchain->list[i].device_index)
 							{
 								mainchain->list[i].token+=branch->deal.token;
-								printf("mainchain(%ld-%ld):%ld\r\n",mainchain->list[i].dag_index,mainchain->list[i].device_index,mainchain->list[i].token);
+								//printf("mainchain(%ld-%ld):%ld\r\n",mainchain->list[i].dag_index,mainchain->list[i].device_index,mainchain->list[i].token);
 							}
 						}
 						//notify device
@@ -403,13 +416,18 @@ void transaction_recv(mainchain_t *mainchain)
 							insert->step=STEP_LEDGER;
 							insert->data=new uint8[sizeof(ledger_t)];
 							*(uint32 *)insert->data=i ? STATUS_DST : STATUS_SRC;
-							*(uint32 *)(insert->data+1*sizeof(uint32))=branch->deal.device_index[i];
-							*(uint32 *)(insert->data+2*sizeof(uint32))=branch->deal.token;
+							*(uint32 *)(insert->data+1*sizeof(uint32))=branch->index;
+							*(uint32 *)(insert->data+2*sizeof(uint32))=branch->deal.device_index[i];
+							*(uint32 *)(insert->data+3*sizeof(uint32))=branch->deal.token;
 							flag=transaction_device(j,mainchain,branch->deal.device_index[i]);
 							if (flag)//not find heavy node
 								queue_insert(mainchain,insert);
 							else
+							{
 								queue_insert(&g_device[j],insert);
+								//printf("mainchain:%ld\r\n",j);
+								g_check[branch->index-1][1+i]=1;delay();
+							}
 						}
 					}
 					//add into dag if width enough
@@ -503,6 +521,8 @@ void ledger_recv(mainchain_t *mainchain)
 			insert->data=new uint8[sizeof(ledger_t)];
 			memcpy(insert->data,queue->data,sizeof(ledger_t));
 			queue_insert(&g_device[j],queue);
+			//printf("mainchain:%ld\r\n",j);
+			delay();
 			//queue delete
 			if (queue==mainchain->queue)
 			{

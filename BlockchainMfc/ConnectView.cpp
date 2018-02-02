@@ -16,6 +16,8 @@ static char THIS_FILE[] = __FILE__;
 
 IMPLEMENT_DYNCREATE(CConnectView, CScrollView)
 
+extern volatile uint8 g_run;//0-停止,1-运行
+
 CConnectView::CConnectView()
 {
 }
@@ -49,9 +51,10 @@ void CConnectView::OnDraw(CDC* pDC)
 */
 
 	CMainFrame *pMain=(CMainFrame *)AfxGetApp()->m_pMainWnd;
-	CBlockchainMfcDoc* pDoc = (CBlockchainMfcDoc *)GetDocument();//这里的CDocument要变为CBlockchainMfcDoc
-	ASSERT_VALID(pDoc);
+	CString str;
 
+	str.Format("%ld",g_run);
+	pDC->TextOut(100,100,str);
 	SetScrollPos(SB_HORZ,pMain->m_scrollsize[0].cx);
 	SetScrollPos(SB_VERT,pMain->m_scrollsize[0].cy);
 /*

@@ -16,6 +16,8 @@
 
 //include
 #include "MainFrm.h"
+#include "layer_mainchain.h"
+#include "layer_device.h"
 
 class CCommandView : public CFormView
 {
@@ -27,9 +29,14 @@ protected:
 public:
 	//{{AFX_DATA(CCommandView)
 	enum { IDD = IDD_FORMVIEW };
-	CListCtrl	m_list;
+	CButton	m_infinite;
+	CButton	m_limit;
+	CListCtrl	m_transaction;
+	CListCtrl	m_device;
 	//}}AFX_DATA
 public:
+	uint8 m_flag;//0-不使用OnSize,1-使用OnSize
+	uint32 m_token;//原始token数
 
 // Overrides
 	// ClassWizard generated virtual function overrides
@@ -48,7 +55,10 @@ protected:
 
 	// Generated message map functions
 	//{{AFX_MSG(CCommandView)
-		// NOTE - the ClassWizard will add and remove member functions here.
+	afx_msg void OnSize(UINT nType, int cx, int cy);
+	afx_msg void OnButtonLimit();
+	afx_msg void OnButtonInfinite();
+	afx_msg void OnTimer(UINT nIDEvent);
 	//}}AFX_MSG
 	DECLARE_MESSAGE_MAP()
 };

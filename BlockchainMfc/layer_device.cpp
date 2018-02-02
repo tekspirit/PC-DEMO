@@ -10,6 +10,8 @@ extern device_t *g_device;//设备数组
 extern mainchain_t g_mainchain;//主链
 extern volatile uint32 g_index;//临时用来统计交易号码的(以后会用hash_t代替,计数从1开始)
 extern volatile uint8 g_flag;//使用timer计时重发
+//
+extern uint8 **g_check;//[g_number][5].0-source,1-mc(src),2-mc(dst),3-node(src),4-node(dst)
 
 //STEP_CONNECT
 void connect_recv(device_t *device)
@@ -58,7 +60,6 @@ void connect_recv(device_t *device)
 					route->node=index.node[i];
 					route->next=NULL;
 					route_insert(device,route);
-					//printf("connect(%ld):%ld\r\n",device->device_index,route->device_index);
 				}
 			}
 			//queue delete
@@ -128,7 +129,6 @@ void connect_seek(device_t *device)
 				route->node=g_device[i].node;
 				route->next=NULL;
 				route_insert(device,route);
-				//printf("connect(%ld):%ld\r\n",device->device_index,route->device_index);
 			}
 		}
 	}
@@ -194,6 +194,8 @@ void connect_send(device_t *device)
 		memcpy(queue->data+(1+3*index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN),index.node,index.number*sizeof(uint8));
 		queue_insert(&g_device[route->device_index],queue);
 		route=route->next;
+		//printf("connect(%ld):%ld\r\n",device->device_index,route->device_index);
+		delay();
 	}
 	//fill mainchain
 	if (device->node==NODE_HEAVY)//若重节点,则传给服务器
@@ -208,6 +210,7 @@ void connect_send(device_t *device)
 		memcpy(queue->data+(1+3*index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN),index.node,index.number*sizeof(uint8));
 		queue_insert(&g_mainchain,queue);
 		//printf("connect(%ld):mainchain\r\n",device->device_index);
+		delay();
 	}
 	//release
 	delete[] index.device_index;
@@ -269,6 +272,7 @@ void connect_resend(device_t *device)
 	memcpy(queue->data+(1+3*index.number)*sizeof(uint32)+index.number*(KEY_E+KEY_LEN),index.node,index.number*sizeof(uint8));
 	queue_insert(&g_mainchain,queue);
 	//printf("connect(%ld):mainchain\r\n",device->device_index);
+	delay();
 	//release
 	delete[] index.device_index;
 	delete[] index.key;
@@ -361,15 +365,18 @@ void transaction_recv(device_t *device)
 						insert->step=STEP_LEDGER;
 						insert->data=new uint8[sizeof(ledger_t)];
 						*(uint32 *)insert->data=flag;
-						*(uint32 *)(insert->data+1*sizeof(uint32))=transaction.deal.device_index[0];
-						*(uint32 *)(insert->data+2*sizeof(uint32))=transaction.deal.token;
+						*(uint32 *)(insert->data+1*sizeof(uint32))=transaction.index;
+						*(uint32 *)(insert->data+2*sizeof(uint32))=transaction.deal.device_index[0];
+						*(uint32 *)(insert->data+3*sizeof(uint32))=transaction.deal.token;
 						queue_insert(&g_device[transaction.deal.device_index[0]],insert);
+						//printf("device(%ld):%ld\r\n",device->device_index,transaction.deal.device_index[0]);
+						delay();
 					}
 					else//源为重节点(自己),则更新token
 					{
 						device->token[0]+=transaction.deal.token;
 						device->token[1]-=transaction.deal.token;
-						printf("device(%ld):%ld-%ld\r\n",device->device_index,device->token[0],device->token[1]);
+						//printf("device(%ld):%ld-%ld\r\n",device->device_index,device->token[0],device->token[1]);
 					}
 				}
 				else//correct则传入服务器
@@ -382,6 +389,8 @@ void transaction_recv(device_t *device)
 					memcpy(insert->data+1*sizeof(uint32)+sizeof(deal_t),queue->data+1*sizeof(uint32)+sizeof(deal_t),KEY_LEN);
 					memcpy(insert->data+1*sizeof(uint32)+sizeof(deal_t)+KEY_LEN,queue->data+1*sizeof(uint32)+sizeof(deal_t)+KEY_LEN,KEY_LEN);
 					queue_insert(&g_mainchain,insert);
+					//printf("device(%ld):mainchain\r\n",device->device_index);
+					delay();
 					//update token
 					if (node==NODE_LIGHT)//源为轻节点,则更新当前重节点的route token
 					{
@@ -445,7 +454,7 @@ transaction_t *transaction_generate(device_t *device)
 		return NULL;
 	if (g_deal[g_index].token>device->token[0])//账本验证
 	{
-		printf("transaction(%ld-%ld):%ld,error\r\n",g_deal[g_index].device_index[0],g_deal[g_index].device_index[1],g_deal[g_index].token);
+		//printf("transaction(%ld-%ld):%ld,error\r\n",g_deal[g_index].device_index[0],g_deal[g_index].device_index[1],g_deal[g_index].token);
 		g_index++;
 		return NULL;
 	}
@@ -456,9 +465,8 @@ transaction_t *transaction_generate(device_t *device)
 	memset(&transaction->plain[i],0,KEY_LEN-i);
 	transaction_signature(transaction,device);
 	transaction->index=++g_index;
-	//transaction->transaction=TRANSACTION_NONE;
-	//transaction->flag=0;//给寻找和计算使用
-	printf("transaction(%ld-%ld):%ld\r\n",transaction->deal.device_index[0],transaction->deal.device_index[1],transaction->deal.token);
+	//printf("transaction(%ld-%ld):%ld\r\n",transaction->deal.device_index[0],transaction->deal.device_index[1],transaction->deal.token);
+	g_check[g_index-1][0]=1;delay();
 
 	return transaction;
 }
@@ -497,7 +505,7 @@ void transaction_send(device_t *device,transaction_t *transaction)
 		{
 			device->token[0]-=transaction->deal.token;
 			device->token[1]+=transaction->deal.token;
-			printf("device(%ld):%ld-%ld\r\n",device->device_index,device->token[0],device->token[1]);
+			//printf("device(%ld):%ld-%ld\r\n",device->device_index,device->token[0],device->token[1]);
 			return;
 		}
 	}
@@ -510,13 +518,17 @@ void transaction_send(device_t *device,transaction_t *transaction)
 	memcpy(queue->data+1*sizeof(uint32)+sizeof(deal_t),transaction->plain,KEY_LEN);
 	memcpy(queue->data+1*sizeof(uint32)+sizeof(deal_t)+KEY_LEN,transaction->cipher,KEY_LEN);
 	if (device->node==NODE_LIGHT)//若是轻节点,则将交易传给第一重节点
+	{
 		queue_insert(&g_device[route->device_index],queue);
+		//printf("device(%ld):%ld\r\n",device->device_index,route->device_index);
+		delay();
+	}
 	else//若是重节点,则更新给自己
 		queue_insert(device,queue);
 	//update ledger
 	device->token[0]-=transaction->deal.token;
 	device->token[1]+=transaction->deal.token;
-	printf("device(%ld):%ld-%ld\r\n",device->device_index,device->token[0],device->token[1]);
+	//printf("device(%ld):%ld-%ld\r\n",device->device_index,device->token[0],device->token[1]);
 }
 
 //STEP_LEDGER
@@ -534,32 +546,38 @@ void ledger_recv(device_t *device)
 			//queue process
 			if (device->node==NODE_HEAVY)//若是重节点
 			{
-				node=route_node(device,*(uint32 *)(queue->data+1*sizeof(uint32)));
+				node=route_node(device,*(uint32 *)(queue->data+2*sizeof(uint32)));
 				if (node==NODE_LIGHT)//目标节点为轻节点,则传递至轻节点更新
 				{
 					insert=new queue_t;
 					insert->step=STEP_LEDGER;
 					insert->data=new uint8[sizeof(ledger_t)];
 					memcpy(insert->data,queue->data,sizeof(ledger_t));
-					queue_insert(&g_device[*(uint32 *)(queue->data+1*sizeof(uint32))],insert);
+					queue_insert(&g_device[*(uint32 *)(queue->data+2*sizeof(uint32))],insert);
+					//printf("device(%ld):%ld\r\n",device->device_index,*(uint32 *)(queue->data+2*sizeof(uint32)));
+					delay();
 				}
 				else//若为重节点,update ledger
 				{
 					switch(*(uint32 *)queue->data)
 					{
 					case STATUS_SRC:
-						device->token[1]-=*(uint32 *)(queue->data+2*sizeof(uint32));
+						device->token[1]-=*(uint32 *)(queue->data+3*sizeof(uint32));
+						g_check[*(uint32 *)(queue->data+1*sizeof(uint32))-1][3]=1;
 						break;
 					case STATUS_DST:
-						device->token[0]+=*(uint32 *)(queue->data+2*sizeof(uint32));
+						device->token[0]+=*(uint32 *)(queue->data+3*sizeof(uint32));
+						g_check[*(uint32 *)(queue->data+1*sizeof(uint32))-1][4]=1;
 						break;
 					case STATUS_DEVICE:
 					case STATUS_LEDGER:
-						device->token[0]+=*(uint32 *)(queue->data+2*sizeof(uint32));
-						device->token[1]-=*(uint32 *)(queue->data+2*sizeof(uint32));
+						device->token[0]+=*(uint32 *)(queue->data+3*sizeof(uint32));
+						device->token[1]-=*(uint32 *)(queue->data+3*sizeof(uint32));
+						g_check[*(uint32 *)(queue->data+1*sizeof(uint32))-1][3]=1;
+						g_check[*(uint32 *)(queue->data+1*sizeof(uint32))-1][4]=1;
 						break;
 					}
-					printf("device(%ld):%ld-%ld\r\n",device->device_index,device->token[0],device->token[1]);
+					//printf("device(%ld):%ld-%ld\r\n",device->device_index,device->token[0],device->token[1]);
 				}
 			}
 			else//若为轻节点,update ledger
@@ -567,18 +585,22 @@ void ledger_recv(device_t *device)
 				switch(*(uint32 *)queue->data)
 				{
 				case STATUS_SRC:
-					device->token[1]-=*(uint32 *)(queue->data+2*sizeof(uint32));
+					device->token[1]-=*(uint32 *)(queue->data+3*sizeof(uint32));
+					g_check[*(uint32 *)(queue->data+1*sizeof(uint32))-1][3]=1;
 					break;
 				case STATUS_DST:
-					device->token[0]+=*(uint32 *)(queue->data+2*sizeof(uint32));
+					device->token[0]+=*(uint32 *)(queue->data+3*sizeof(uint32));
+					g_check[*(uint32 *)(queue->data+1*sizeof(uint32))-1][4]=1;
 					break;
 				case STATUS_DEVICE:
 				case STATUS_LEDGER:
-					device->token[0]+=*(uint32 *)(queue->data+2*sizeof(uint32));
-					device->token[1]-=*(uint32 *)(queue->data+2*sizeof(uint32));
+					device->token[0]+=*(uint32 *)(queue->data+3*sizeof(uint32));
+					device->token[1]-=*(uint32 *)(queue->data+3*sizeof(uint32));
+					g_check[*(uint32 *)(queue->data+1*sizeof(uint32))-1][3]=1;
+					g_check[*(uint32 *)(queue->data+1*sizeof(uint32))-1][4]=1;
 					break;
 				}
-				printf("device(%ld):%ld-%ld\r\n",device->device_index,device->token[0],device->token[1]);
+				//printf("device(%ld):%ld-%ld\r\n",device->device_index,device->token[0],device->token[1]);
 			}
 			//queue delete
 			if (queue==device->queue)

@@ -28,18 +28,23 @@ Type=0
 HeaderFile=BlockchainMfc.h
 ImplementationFile=BlockchainMfc.cpp
 Filter=N
+LastObject=CBlockchainMfcApp
 
 [CLS:CBlockchainMfcDoc]
 Type=0
 HeaderFile=BlockchainMfcDoc.h
 ImplementationFile=BlockchainMfcDoc.cpp
 Filter=N
+LastObject=CBlockchainMfcDoc
 
 [CLS:CBlockchainMfcView]
 Type=0
 HeaderFile=BlockchainMfcView.h
 ImplementationFile=BlockchainMfcView.cpp
 Filter=C
+LastObject=CBlockchainMfcView
+BaseClass=CView
+VirtualFilter=VWC
 
 
 [CLS:CMainFrame]
@@ -114,10 +119,11 @@ Filter=C
 [DLG:IDD_FORMVIEW (English (U.S.))]
 Type=1
 Class=CCommandView
-ControlCount=3
-Control1=IDC_LIST,SysListView32,1350631425
-Control2=IDC_BUTTON_TXT,button,1342242816
-Control3=IDC_BUTTON_LOOP,button,1342242816
+ControlCount=4
+Control1=IDC_LIST_TRANSACTION,SysListView32,1350631425
+Control2=IDC_BUTTON_LIMIT,button,1342242816
+Control3=IDC_BUTTON_INFINITE,button,1342242816
+Control4=IDC_LIST_DEVICE,SysListView32,1350631425
 
 [CLS:CCommandView]
 Type=0

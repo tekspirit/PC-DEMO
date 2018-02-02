@@ -9,11 +9,6 @@
 #pragma once
 #endif // _MSC_VER > 1000
 
-//include
-#include "ConnectView.h"
-#include "TransactionView.h"
-#include "CommandView.h"
-
 class CMainFrame : public CFrameWnd
 {
 protected: // create from serialization only
@@ -47,8 +42,6 @@ protected:  // control bar embedded members
 protected:
 	//{{AFX_MSG(CMainFrame)
 	afx_msg int OnCreate(LPCREATESTRUCT lpCreateStruct);
-		// NOTE - the ClassWizard will add and remove member functions here.
-		//    DO NOT EDIT what you see in these blocks of generated code!
 	//}}AFX_MSG
 	DECLARE_MESSAGE_MAP()
 };

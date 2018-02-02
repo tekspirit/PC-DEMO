@@ -8,8 +8,9 @@
 //
 
 //include
-#include "BlockchainMfcDoc.h"
 #include "MainFrm.h"
+#include "layer_mainchain.h"
+#include "layer_device.h"
 
 /////////////////////////////////////////////////////////////////////////////
 // CConnectView view

@@ -62,16 +62,6 @@ END
 
 /////////////////////////////////////////////////////////////////////////////
 //
-// Icon
-//
-
-// Icon with lowest ID value placed first to ensure application icon
-// remains consistent on all systems.
-IDR_MAINFRAME           ICON    DISCARDABLE     "res\\BlockchainMfc.ico"
-IDR_BLOCKCTYPE          ICON    DISCARDABLE     "res\\BlockchainMfcDoc.ico"
-
-/////////////////////////////////////////////////////////////////////////////
-//
 // Menu
 //
 
@@ -122,7 +112,7 @@ STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "关于 BlockchainMfc"
 FONT 9, "宋体"
 BEGIN
-    ICON            IDR_MAINFRAME,IDC_STATIC,11,17,20,20
+    ICON            IDI_MAINFRAME,IDC_STATIC,11,17,20,20
     LTEXT           "BlockchainMfc 1.0 版",IDC_STATIC,40,10,119,8,
                     SS_NOPREFIX
     LTEXT           "版权所有 (C) 2018",IDC_STATIC,40,25,119,8
@@ -151,8 +141,9 @@ VS_VERSION_INFO VERSIONINFO
 BEGIN
     BLOCK "StringFileInfo"
     BEGIN
-        BLOCK "080404B0"
+        BLOCK "080404b0"
         BEGIN
+            VALUE "Comments", "\0"
             VALUE "CompanyName", "\0"
             VALUE "FileDescription", "BlockchainMfc Microsoft 基础类应用程序\0"
             VALUE "FileVersion", "1, 0, 0, 1\0"
@@ -160,8 +151,10 @@ BEGIN
             VALUE "LegalCopyright", "版权所有 (C) 2018\0"
             VALUE "LegalTrademarks", "\0"
             VALUE "OriginalFilename", "BlockchainMfc.EXE\0"
+            VALUE "PrivateBuild", "\0"
             VALUE "ProductName", "BlockchainMfc 应用程序\0"
             VALUE "ProductVersion", "1, 0, 0, 1\0"
+            VALUE "SpecialBuild", "\0"
         END
     END
     BLOCK "VarFileInfo"
@@ -191,6 +184,15 @@ BEGIN
 END
 #endif    // APSTUDIO_INVOKED
 
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+IDI_MAINFRAME           ICON    DISCARDABLE     "res\\logo.ico"
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -329,14 +331,16 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 // Dialog
 //
 
-IDD_FORMVIEW DIALOG DISCARDABLE  0, 0, 185, 95
+IDD_FORMVIEW DIALOG DISCARDABLE  0, 0, 185, 142
 STYLE WS_CHILD
 FONT 8, "MS Sans Serif"
 BEGIN
-    CONTROL         "List1",IDC_LIST,"SysListView32",LVS_REPORT | WS_BORDER | 
-                    WS_TABSTOP,31,19,60,50
-    PUSHBUTTON      "",IDC_BUTTON_TXT,111,20,50,14
-    PUSHBUTTON      "",IDC_BUTTON_LOOP,112,54,50,14
+    CONTROL         "List1",IDC_LIST_TRANSACTION,"SysListView32",LVS_REPORT | 
+                    WS_BORDER | WS_TABSTOP,20,20,60,50
+    PUSHBUTTON      "limit case",IDC_BUTTON_LIMIT,111,20,50,14
+    PUSHBUTTON      "infinite case",IDC_BUTTON_INFINITE,112,54,50,14
+    CONTROL         "List1",IDC_LIST_DEVICE,"SysListView32",LVS_REPORT | 
+                    WS_BORDER | WS_TABSTOP,21,77,60,50
 END
 
 
@@ -353,7 +357,7 @@ BEGIN
         LEFTMARGIN, 7
         RIGHTMARGIN, 178
         TOPMARGIN, 7
-        BOTTOMMARGIN, 88
+        BOTTOMMARGIN, 135
     END
 END
 #endif    // APSTUDIO_INVOKED

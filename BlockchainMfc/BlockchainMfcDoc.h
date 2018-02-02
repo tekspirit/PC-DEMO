@@ -9,22 +9,12 @@
 #pragma once
 #endif // _MSC_VER > 1000
 
-//include
-#include "layer_mainchain.h"
-#include "layer_device.h"
-
 class CBlockchainMfcDoc : public CDocument
 {
 protected: // create from serialization only
 	CBlockchainMfcDoc();
 	DECLARE_DYNCREATE(CBlockchainMfcDoc)
-
-// Attributes
 public:
-
-// Operations
-public:
-
 // Overrides
 	// ClassWizard generated virtual function overrides
 	//{{AFX_VIRTUAL(CBlockchainMfcDoc)
@@ -40,9 +30,6 @@ public:
 	virtual void AssertValid() const;
 	virtual void Dump(CDumpContext& dc) const;
 #endif
-
-protected:
-
 // Generated message map functions
 protected:
 	//{{AFX_MSG(CBlockchainMfcDoc)

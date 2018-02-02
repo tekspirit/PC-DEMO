@@ -58,6 +58,7 @@ struct spv_t
 struct ledger_t
 {
 	uint32 status;//交易状态(正确/错误)
+	uint32 index;//交易索引
 	uint32 device_index;//设备索引(类似于唯一物理地址)
 	uint32 token;//交易数额
 };
@@ -77,19 +78,6 @@ struct transaction_t
 	transaction_t *trunk;//主交易节点
 	transaction_t *branch;//从交易节点
 	transaction_t *next;//tip链表使用
-	/*
-	uint32 weight_self;//自身权重
-	uint32 weight_accu;//累积权重
-	uint32 height;//高度(至创世块)
-	uint32 depth;//深度(至最远tip)
-	uint32 integral;//交易积分
-	uint32 nonce;//临时随机数(证明是从当前device发出,防止女巫攻击和批量交易攻击)
-	*/
-	//hash_t address;//地址
-	//hash_t trunk;//主交易
-	//hash_t branch;//从交易
-	//hash_t bundle;//包
-	//hash_t tag;//标签
 };
 struct key_t
 {
@@ -139,26 +127,7 @@ struct device_t
 	queue_t *queue;//消息队列
 	rsa_t rsa;//当前设备的公私钥对
 	uint32 token[2];//账户数额(0-可使用数额,1-冻结数额)
-	transaction_t *dag;//账本dag链表(重节点-区域账本,轻节点-无账本)
-
-/*
-	//index_t *index;//设备索引链表
-	//dag
-	volatile uint32 dag_index;//子链索引.0-孤立点,其他-索引号
-	uint8 status;//0-作为free,1-作为master,2-作为slave
-	route_t *route;//连接设备路由链表
-	//queue_t queue[QUEUE_LENGTH];//设备的消息队列(发送/接收)
-	uint32 queue_index;//queue索引长度
-	//dag
-	volatile uint32 dag_index;//子链索引.0-孤立点,其他-索引号
-	transaction_t tangle[TANGLE_LENGTH];//主tangle队列
-	volatile uint32 tangle_index;//主tangle索引长度
-	transaction_t transaction[TRANSACTION_LENGTH];//transaction队列
-	volatile uint32 transaction_index;//transaction索引长度
-	//application
-	uint32 account_id;//账户id
-	uint32 account_money;//账户数额
-	*/
+	//transaction_t *dag;//账本dag链表(重节点-区域账本,轻节点-无账本)
 };
 //function
 void route_insert(device_t *device,route_t *route);
@@ -178,3 +147,4 @@ uint32 dag_num(transaction_t *dag);
 uint32 dag_tip(void);
 void key_generate(device_t *device);
 void move_location(device_t *device,uint32 step,uint32 range);
+void delay(void);
